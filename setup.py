@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2022.
+#     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 7/26/22, 1:49 PM
+#     Last change on 9/10/24, 1:25 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -51,7 +51,7 @@ def main():
 
     return setup(name="GasNetSim",
                  version=version,
-                 author="IEK-10: Energy Systems Engineering, Forschungszentrum Jülich GmbH",
+                 author="ICE-1: Energy Systems Engineering, Forschungszentrum Jülich GmbH",
                  author_email="yifei.lu@fz-juelich.de",
                  description="A tool for gas network steady-state simulation.",
                  long_description=long_description,
@@ -59,7 +59,7 @@ def main():
                  python_requires=">=3.9.16",
                  install_requires=requirements,
                  classifiers=["Programming Language :: Python :: 3.9",
-                              "License :: OSI Approved :: Mozilla Public License 2.0",
+                              "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
                               "Operating System :: OS Independent"],
                  url="https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim",
                  project_urls={
