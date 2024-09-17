@@ -1,4 +1,4 @@
-![](docs/GasNetSim_Logo.svg)
+![](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/-/raw/main/docs/GasNetSim_Logo.svg)
 
 [//]: # ([![PyPI]&#40;https://badge.fury.io/py/GasNetSim.svg&#41;]&#40;https://badge.fury.io/py/GasNetSim&#41;)
 [![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-370/)
