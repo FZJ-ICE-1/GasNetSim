@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/4/24, 9:29 AM
+#     Last change on 9/18/24, 10:57 PM
 #     Last change by yifei
 #    *****************************************************************************
 import copy
@@ -16,6 +16,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from timeit import default_timer as timer
 from numba import njit, float64, boolean
+import networkx as nx
 
 from ..pipeline import Pipeline
 
@@ -144,6 +145,38 @@ def create_branch_flow_matrix(nodes, connections, use_cuda=False):
     return _branch_flow_matrix
 
 
+def create_directed_graph_using_flow_directions(pipelines):
+    G = nx.DiGraph()
+    edge_index = {}
+    for i, pipeline in pipelines.items():
+        if pipeline.flow_velocity is None:
+            G.add_edge(pipeline.inlet_index, pipeline.outlet_index, flow_rate=1., composition=[])
+            edge_index[(pipeline.inlet_index, pipeline.outlet_index)] = i
+        elif pipeline.flow_velocity >= 0:
+            G.add_edge(pipeline.inlet_index, pipeline.outlet_index)
+            edge_index[(pipeline.inlet_index, pipeline.outlet_index)] = i
+        else:
+            G.add_edge(pipeline.outlet_index, pipeline.inlet_index)
+            edge_index[(pipeline.outlet_index, pipeline.inlet_index)] = i
+    return G, edge_index
+
+
+def topological_sort_of_nodes(graph):
+    if not nx.is_directed_acyclic_graph(graph):
+        raise ValueError("The graph must be a Directed Acyclic Graph (DAG) to perform topological sorting.")
+
+    nodes_topological_order = list(nx.topological_sort(graph))
+
+    return nodes_topological_order
+
+def topological_sort_of_edges(graph, edge_index):
+    edge_indices_order = []
+    nodes_topological_order = topological_sort_of_nodes(graph)
+    for node in nodes_topological_order:
+        for successor in graph.successors(node):
+            edge_indices_order.append(edge_index[(node, successor)])
+    return edge_indices_order
+
 def create_nodal_composition_matrix(nodes, connections, use_cuda=False):
     _branch_flow_matrix = create_branch_flow_matrix(nodes, connections)
 
@@ -176,15 +209,19 @@ def calculate_nodal_inflow_states(nodes, connections, mapping_connections,
     to_update = True
     _prev_nodal_composition_matrix = np.zeros((21, (len(nodes))))
 
-    _count_nodal_inflow_iterations = 0
+    # _count_nodal_inflow_iterations = 0
+
+    pipelines = {i: c for i, c in connections.items() if type(c) == Pipeline}
+    graph, edge_index = create_directed_graph_using_flow_directions(pipelines)
+    edge_orders = topological_sort_of_edges(graph, edge_index)
 
     while to_update:
-        _count_nodal_inflow_iterations += 1
-        for connection in connections.values():
-            if type(connection) == Pipeline:
-                connection = gas_composition_tracking(connection, time_step=time_step, method=tracking_method)
+        # _count_nodal_inflow_iterations += 1
+        for i in edge_orders:
+            pipelines[i] = gas_composition_tracking(pipelines[i], time_step=time_step, method=tracking_method)
 
         _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
+
         nodes = update_temporary_nodal_gas_mixture_properties(nodes, _nodal_composition_matrix)
         if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
             to_update = False

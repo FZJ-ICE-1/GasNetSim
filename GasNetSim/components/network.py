@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/4/24, 9:28 AM
+#     Last change on 9/18/24, 10:03 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -599,6 +599,7 @@ class Network:
             for node in self.nodes.values():
                 node.gas_mixture.eos_composition_tmp = node.gas_mixture.eos_composition
 
+            self.update_connection_flow_rate()
             nodal_gas_inflow_composition = calculate_nodal_inflow_states(self.nodes, self.connections,
                                                                          mapping_connections,
                                                                          tracking_method=tracking_method)
