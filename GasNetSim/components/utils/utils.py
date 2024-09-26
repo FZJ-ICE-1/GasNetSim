@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/18/24, 10:57 PM
+#     Last change on 9/26/24, 10:15 AM
 #     Last change by yifei
 #    *****************************************************************************
 import copy
@@ -156,28 +156,44 @@ def create_branch_flow_matrix(nodes, connections, use_cuda=False):
     return _branch_flow_matrix
 
 
-def create_directed_graph_using_flow_directions(pipelines):
-    G = nx.DiGraph()
+def create_directed_graph_using_flow_directions(pipelines: dict):
+    """
+    Creates a directed graph from pipelines using their flow directions.
+
+    :param pipelines: A dictionary of pipelines.
+
+    :return: A tuple containing:
+             - G: A NetworkX MultiDiGraph representing the pipelines with directed edges.
+             - edge_index: A dictionary mapping edge identifiers to pipeline indices.
+    """
+    G = nx.MultiDiGraph()
     edge_index = {}
     for i, pipeline in pipelines.items():
         if pipeline.flow_velocity is None:
             G.add_edge(
                 pipeline.inlet_index,
                 pipeline.outlet_index,
+                key=i,  # Use the pipeline index as the key
                 flow_rate=1.0,
                 composition=[],
             )
-            edge_index[(pipeline.inlet_index, pipeline.outlet_index)] = i
+            edge_index[(pipeline.inlet_index, pipeline.outlet_index, i)] = i
         elif pipeline.flow_velocity >= 0:
-            G.add_edge(pipeline.inlet_index, pipeline.outlet_index)
-            edge_index[(pipeline.inlet_index, pipeline.outlet_index)] = i
+            G.add_edge(pipeline.inlet_index, pipeline.outlet_index, key=i)
+            edge_index[(pipeline.inlet_index, pipeline.outlet_index, i)] = i
         else:
-            G.add_edge(pipeline.outlet_index, pipeline.inlet_index)
-            edge_index[(pipeline.outlet_index, pipeline.inlet_index)] = i
+            G.add_edge(pipeline.outlet_index, pipeline.inlet_index, key=i)
+            edge_index[(pipeline.outlet_index, pipeline.inlet_index, i)] = i
     return G, edge_index
 
 
-def topological_sort_of_nodes(graph):
+def topological_sort_of_nodes(graph: nx.MultiDiGraph):
+    """
+    Perform a topological sort of the nodes in a MultiDiGraph.
+
+    :param graph: A NetworkX MultiDiGraph representing the DAG.
+    :return: A list of nodes in topological order.
+    """
     if not nx.is_directed_acyclic_graph(graph):
         raise ValueError(
             "The graph must be a Directed Acyclic Graph (DAG) to perform topological sorting."
@@ -188,12 +204,22 @@ def topological_sort_of_nodes(graph):
     return nodes_topological_order
 
 
-def topological_sort_of_edges(graph, edge_index):
+def topological_sort_of_edges(graph: nx.MultiDiGraph, edge_index: dict):
+    """
+    Perform a topological sort of the edges in a MultiDiGraph.
+
+    :param graph: A MultiDiGraph representing the network.
+    :param edge_index: A dictionary mapping (node, successor, key) to edge indices.
+    :return: A list of edge indices in topological order.
+    """
     edge_indices_order = []
     nodes_topological_order = topological_sort_of_nodes(graph)
     for node in nodes_topological_order:
         for successor in graph.successors(node):
-            edge_indices_order.append(edge_index[(node, successor)])
+            # Get all edges between node and successor
+            edges = graph.get_edge_data(node, successor)
+            for key in edges:
+                edge_indices_order.append(edge_index[(node, successor, key)])
     return edge_indices_order
 
 
@@ -251,6 +277,8 @@ def calculate_nodal_inflow_states(
             pipelines[i] = gas_composition_tracking(
                 pipelines[i], time_step=time_step, method=tracking_method
             )
+            if pipelines[i].outflow_composition is None:
+                raise ValueError("Check the topological order!")
 
         _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
 
