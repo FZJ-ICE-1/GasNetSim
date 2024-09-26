@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/18/24, 10:03 PM
+#     Last change on 9/26/24, 8:44 AM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -472,6 +472,8 @@ class Network:
             self.nodes[i + 1].pressure = pressure[i]
             self.nodes[i + 1].volumetric_flow = flow[i]
             self.nodes[i + 1].convert_volumetric_to_energy_flow()
+            self.nodes[i + 1].gas_mixture.pressure = self.nodes[i + 1].pressure
+            self.nodes[i + 1].gas_mixture.temperature = self.nodes[i + 1].temperature
             self.nodes[i + 1].gas_mixture.update_gas_mixture()
 
     # def simulation(self, composition_tracking=False):
@@ -580,7 +582,7 @@ class Network:
         logging.info(f'Initial pressure: {p}')
         logging.info(f'Initial flow: {f_target}')
 
-        reference_nodes = [x-1 for x in self.reference_nodes]  # indices of reference nodes
+        reference_nodes = [x - 1 for x in self.reference_nodes]  # indices of reference nodes
         self.update_node_parameters(pressure=p, flow=f_target, temperature=t)
         if self.pipelines is not None:
             self.update_pipeline_parameters()
@@ -608,7 +610,7 @@ class Network:
             #                                                        mapping_connections, f_mat)
             # nodal_gas_inflow_composition = inflow_xi
             # nodal_gas_inflow_temperature = inflow_temp
-            # update_temporaray_nodal_gas_mixture_properties(self.nodes, nodal_gas_inflow_composition)
+            update_temporary_nodal_gas_mixture_properties(self.nodes, nodal_gas_inflow_composition)
 
             if use_cuda:
                 nodal_flow = cp.sum(f_mat, axis=1)
@@ -656,7 +658,13 @@ class Network:
 
             logging.debug(max([abs(x) for x in (delta_flow/target_flow)]))
             logging.debug(delta_p)
-            # self.update_connection_flow_rate()
+            self.update_connection_flow_rate()
+
+            self.update_node_parameters(pressure=p, flow=f_target, temperature=t)
+            if self.pipelines is not None:
+                self.update_pipeline_parameters()
+            if self.resistances is not None:
+                self.update_resistance_parameters()
 
             # plt.figure()
             # plt.plot(delta_flow)
