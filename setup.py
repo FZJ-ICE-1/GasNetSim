@@ -8,13 +8,13 @@
 #    *****************************************************************************
 
 import subprocess
-from setuptools import setup, find_packages
 
+from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-with open('requirements.txt', 'r') as requirements_file:
+with open("requirements.txt", "r") as requirements_file:
     requirements_text = requirements_file.read()
     requirements = requirements_text.splitlines()
 
@@ -49,24 +49,27 @@ def main():
 
     print(version)
 
-    return setup(name="GasNetSim",
-                 version=version,
-                 author="ICE-1: Energy Systems Engineering, Forschungszentrum Jülich GmbH",
-                 author_email="yifei.lu@fz-juelich.de",
-                 description="A tool for gas network steady-state simulation.",
-                 long_description=long_description,
-                 long_description_content_type="text/markdown",
-                 python_requires=">=3.9.16",
-                 install_requires=requirements,
-                 classifiers=["Programming Language :: Python :: 3.9",
-                              "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
-                              "Operating System :: OS Independent"],
-                 url="https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim",
-                 project_urls={
-                     "Bug Tracker": "https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/-/issues",
-                 },
-                 packages=find_packages()
-                 )
+    return setup(
+        name="GasNetSim",
+        version=version,
+        author="ICE-1: Energy Systems Engineering, Forschungszentrum Jülich GmbH",
+        author_email="yifei.lu@fz-juelich.de",
+        description="A tool for gas network steady-state simulation.",
+        long_description=long_description,
+        long_description_content_type="text/markdown",
+        python_requires=">=3.9.16",
+        install_requires=requirements,
+        classifiers=[
+            "Programming Language :: Python :: 3.9",
+            "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+            "Operating System :: OS Independent",
+        ],
+        url="https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim",
+        project_urls={
+            "Bug Tracker": "https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/-/issues",
+        },
+        packages=find_packages(),
+    )
 
 
 if __name__ == "__main__":

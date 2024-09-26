@@ -18,7 +18,7 @@ def calculate_beta_coefficient(ul, qm, cp, D):
     :param D: pipeline diameter [m]
     :return:
     """
-    return ul/(qm*cp) * math.pi * D
+    return ul / (qm * cp) * math.pi * D
 
 
 def calculate_gamma_coefficient(mu_jt, Z, R_specific, f, qm, p_avg, D):
@@ -33,8 +33,8 @@ def calculate_gamma_coefficient(mu_jt, Z, R_specific, f, qm, p_avg, D):
     :param D: Pipeline diameter [m]
     :return: Gamma coefficient used for the calculation of pipeline outlet temperature
     """
-    A = math.pi * (D/2)**2
-    return mu_jt * Z * R_specific * f * qm * abs(qm) / (2*p_avg*D*A**2)
+    A = math.pi * (D / 2) ** 2
+    return mu_jt * Z * R_specific * f * qm * abs(qm) / (2 * p_avg * D * A**2)
 
 
 def calculate_pipeline_outlet_temperature(beta, gamma, Ts, L, T1):
@@ -47,7 +47,9 @@ def calculate_pipeline_outlet_temperature(beta, gamma, Ts, L, T1):
     :param T1: Temperature at pipeline inlet [K]
     :return: Temperature at pipeline outlet [K]
     """
-    return beta/(beta-gamma)*(Ts - Ts * math.exp((gamma-beta)*L)) + T1*math.exp((gamma-beta)*L)
+    return beta / (beta - gamma) * (
+        Ts - Ts * math.exp((gamma - beta) * L)
+    ) + T1 * math.exp((gamma - beta) * L)
 
 
 def calculate_steady_state_outlet_temperature(beta, gamma, Ts):
@@ -62,9 +64,11 @@ if __name__ == "__main__":
     # from GasNetSim.components.utils.gas_mixture.thermo.thermo import Mixture
     from GasNetSim.components.gas_mixture import GasMixture
 
-    gas_mixture = GasMixture(temperature=300,
-                             pressure=50 * bar,
-                             composition={"methane": 0.9, "hydrogen": 0.1})
+    gas_mixture = GasMixture(
+        temperature=300,
+        pressure=50 * bar,
+        composition={"methane": 0.9, "hydrogen": 0.1},
+    )
     heat_transfer_coefficient = 3.69 * 10
     mass_flow_rate = 55  # kg/s
     Cp = gas_mixture.heat_capacity_constant_pressure
@@ -73,9 +77,13 @@ if __name__ == "__main__":
     Z = gas_mixture.compressibility
     R_specific = gas_mixture.R_specific
     friction_factor = 0.01
-    average_pressure = 50*bar
-    beta = calculate_beta_coefficient(heat_transfer_coefficient, mass_flow_rate, Cp, diameter)
-    gamma = calculate_gamma_coefficient(JT, Z, R_specific, friction_factor, mass_flow_rate, average_pressure, diameter)
+    average_pressure = 50 * bar
+    beta = calculate_beta_coefficient(
+        heat_transfer_coefficient, mass_flow_rate, Cp, diameter
+    )
+    gamma = calculate_gamma_coefficient(
+        JT, Z, R_specific, friction_factor, mass_flow_rate, average_pressure, diameter
+    )
     T_outlet = calculate_pipeline_outlet_temperature(beta, gamma, 288.15, 150000, 300)
     print(beta, gamma)
     print(T_outlet)
@@ -93,7 +101,9 @@ if __name__ == "__main__":
     for i in range(1, 151):
         Xs_EF[i] = Xs_EF[i - 1] + dx * (a * Xs_EF[i - 1] + b)
         Xs_EB[i] = 1 / (1 - dx * a) * (Xs_EB[i - 1] + dx * b)
-        Xs_TR[i] = (1 + dx * a / 2) / (1 - dx * a / 2) * Xs_TR[i - 1] + (dx * b) / (1 - dx * a / 2)
+        Xs_TR[i] = (1 + dx * a / 2) / (1 - dx * a / 2) * Xs_TR[i - 1] + (dx * b) / (
+            1 - dx * a / 2
+        )
 
     plt.figure()
     plt.plot(Xs_EF, label="Euler forward")

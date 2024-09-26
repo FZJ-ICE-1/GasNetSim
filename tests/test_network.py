@@ -9,11 +9,13 @@
 #   3. test_network_composition_balance() - to ensure the accuracy of gas composition within a network simulation.
 # **********************************************************************************************************************
 
-import os
-import GasNetSim as gns
-from pathlib import Path
-from numpy.testing import assert_almost_equal, assert_allclose
 import logging
+import os
+from pathlib import Path
+
+from numpy.testing import assert_almost_equal, assert_allclose
+
+import GasNetSim as gns
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,17 +23,17 @@ logger = logging.getLogger(__name__)
 
 def find_git_root(path):
     """
-        Find the root path of the Git repository starting from the given path.
+    Find the root path of the Git repository starting from the given path.
 
-        Args:
-        - path: The starting directory path to search from.
+    Args:
+    - path: The starting directory path to search from.
 
-        Returns:
-        - The root path of the Git repository or None if not found.
+    Returns:
+    - The root path of the Git repository or None if not found.
     """
     # Traverse up the directory tree until finding the .git folder
-    while path != '/':
-        if os.path.isdir(os.path.join(path, '.git')):
+    while path != "/":
+        if os.path.isdir(os.path.join(path, ".git")):
             return path
         path = os.path.dirname(path)
     return None
@@ -39,16 +41,16 @@ def find_git_root(path):
 
 def test_network_volume_flow_rate_balance():
     """
-        Test to ensure the volume flow rate balance within a network.
-        Calculates the total inflow and outflow across all nodes in the network to verify conservation
-        of volume flow rates.
+    Test to ensure the volume flow rate balance within a network.
+    Calculates the total inflow and outflow across all nodes in the network to verify conservation
+    of volume flow rates.
     """
 
     # Find the current absolute path
     test_directory_path = os.path.abspath(os.getcwd())
     # Find the root path of the Git repository
     root_path = find_git_root(test_directory_path)
-    new_path = os.path.join(root_path, 'examples', 'Irish13')
+    new_path = os.path.join(root_path, "examples", "Irish13")
 
     # Create a network instance with Irish13
     # Initialize the network with nodes and connections from a CSV file in the current directory
@@ -74,8 +76,10 @@ def test_network_volume_flow_rate_balance():
     outlet_flows = []
 
     # Calculate initial flow rates from the nodes
-    initial_flows = {node_index: node.volumetric_flow if node.volumetric_flow is not None else 0
-                     for node_index, node in network.nodes.items()}
+    initial_flows = {
+        node_index: node.volumetric_flow if node.volumetric_flow is not None else 0
+        for node_index, node in network.nodes.items()
+    }
 
     # Iterate through nodes in the network to gather inlet and outlet flow information
     for node_index, node in network.nodes.items():
@@ -111,19 +115,21 @@ def test_network_volume_flow_rate_balance():
     assert_almost_equal(total_inflow, total_outflow)
 
     # If the assertion passes, print a message indicating that the test passed
-    logger.info(f"Test passed: Results match the expected values for volume_flow_rate_balance.")
+    logger.info(
+        f"Test passed: Results match the expected values for volume_flow_rate_balance."
+    )
 
 
 def test_network_energy_flow_balance():
     """
-        Test to ensure the energy flow balance within a network.
-        Calculates the energy flowing in and out of each node in the network to verify energy conservation.
+    Test to ensure the energy flow balance within a network.
+    Calculates the energy flowing in and out of each node in the network to verify energy conservation.
     """
     # Find the current absolute path
     test_directory_path = os.path.abspath(os.getcwd())
     # Find the root path of the Git repository
     root_path = find_git_root(test_directory_path)
-    new_path = os.path.join(root_path, 'examples', 'Irish13')
+    new_path = os.path.join(root_path, "examples", "Irish13")
 
     # Create a network instance with Irish13
     # Initialize the network with nodes and connections from a CSV file in the current directory
@@ -135,8 +141,10 @@ def test_network_energy_flow_balance():
 
     # Calculate energy flow at inlet and outlet for each node over the entire Network
     # Calculate initial flow rates from the nodes
-    initial_volume_flows = {node_index: node.volumetric_flow if node.volumetric_flow is not None else 0
-                            for node_index, node in network.nodes.items()}
+    initial_volume_flows = {
+        node_index: node.volumetric_flow if node.volumetric_flow is not None else 0
+        for node_index, node in network.nodes.items()
+    }
 
     # Iterate through nodes in the network to gather inlet and outlet flow information
     for node_index, node in network.nodes.items():
@@ -170,20 +178,21 @@ def test_network_energy_flow_balance():
         # print(f"inlet = {inlet_flow}, outlet = {outlet_flow}")
 
     # If the assertion passes, print a message indicating that the test passed
-    logger.info(f"Test passed: Results match the expected values for energy_flow_rate_balance.")
+    logger.info(
+        f"Test passed: Results match the expected values for energy_flow_rate_balance."
+    )
 
 
 def test_network_composition_balance():
-
     """
-        Test to ensure the accuracy of gas composition within a network simulation.
-        Calculates the total volumetric flow rate and component wise flow rate to verify the composition balance.
+    Test to ensure the accuracy of gas composition within a network simulation.
+    Calculates the total volumetric flow rate and component wise flow rate to verify the composition balance.
     """
     # Find the current absolute path
     test_directory_path = os.path.abspath(os.getcwd())
     # Find the root path of the Git repository
     root_path = find_git_root(test_directory_path)
-    new_path = os.path.join(root_path, 'examples', 'Irish13')
+    new_path = os.path.join(root_path, "examples", "Irish13")
 
     # Create a network instance with Irish13
     # Initialize the network with nodes and connections from a CSV file in the current directory
@@ -196,11 +205,15 @@ def test_network_composition_balance():
     # Calculate the composition balance for each pipeline using volumetric flow rates
     for i, pipeline in network.pipelines.items():
         # Calculate the total volumetric flow rate
-        volumetric_flow_rate = pipeline.flow_rate  # Assuming flow rate is already volumetric
+        volumetric_flow_rate = (
+            pipeline.flow_rate
+        )  # Assuming flow rate is already volumetric
 
         # Calculate the volumetric flow rate of each component (assuming mole_fraction is equivalent to volume fraction)
-        component_flow_rates = {component: mole_fraction * volumetric_flow_rate
-                                for component, mole_fraction in pipeline.gas_mixture.composition.items()}
+        component_flow_rates = {
+            component: mole_fraction * volumetric_flow_rate
+            for component, mole_fraction in pipeline.gas_mixture.composition.items()
+        }
         # print(component_flow_rates)
 
         # Calculate the total component volumetric flow rate
@@ -211,4 +224,6 @@ def test_network_composition_balance():
         # print([total_component_volumetric_flow_rate, volumetric_flow_rate])
 
     # If the assertion passes, print a message indicating that the test passed
-    logger.info(f"Test passed: Results match the expected values for composition_balance.")
+    logger.info(
+        f"Test passed: Results match the expected values for composition_balance."
+    )

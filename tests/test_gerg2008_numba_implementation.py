@@ -18,12 +18,12 @@
 # ConvertCompositionGERG, MolarMassGERG, PressureGERG, DensityGERG, Alpha0GERG, ReducingParametersGERG,
 # PropertiesGERG, PseudoCriticalPointGERG, and AlpharGERG.
 
+from numpy.testing import assert_almost_equal, assert_allclose
 # Each test is designed to assert the correctness and consistency of calculations involved in determining properties
 # like heating value, molar mass, pressure, density, ideal gas Helmholtz energy, reducing parameters,
 # pseudo-critical point, and residual Helmholtz energy.
 # **********************************************************************************************************************
 from scipy.constants import bar
-from numpy.testing import assert_almost_equal, assert_allclose
 
 from GasNetSim.components.gas_mixture.GERG2008 import *
 from GasNetSim.components.gas_mixture.GERG2008 import convert_to_gerg2008_composition
@@ -32,7 +32,7 @@ from GasNetSim.components.gas_mixture.GERG2008 import convert_to_gerg2008_compos
 # Test the tanh, sinh, and cosh functions
 def test_tanh_sinh_cosh():
     """
-        Test the numba version of the hyperbolic tangent (tanh), hyperbolic sine (sinh), and hyperbolic cosine (cosh) functions.
+    Test the numba version of the hyperbolic tangent (tanh), hyperbolic sine (sinh), and hyperbolic cosine (cosh) functions.
     """
     test_cases = [-1.0, 0.0, 1.0]
     for x in test_cases:
@@ -43,32 +43,87 @@ def test_tanh_sinh_cosh():
 
 def test_heating_value():
     """
-        Test the numba version of the CalculateHeatingValue function of GasMixtureGERG2008 class.
+    Test the numba version of the CalculateHeatingValue function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for _i in range(21):
         nist_gas_mixture[a[_i]] = b[_i]
 
     gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, gerg2008_composition, use_numba=False
+    )
 
     # Test the CalculateHeatingValue function
-    expected_heating_value = gas_mixture.CalculateHeatingValue(comp=gerg2008_composition, hhv=True, parameter="volume")
+    expected_heating_value = gas_mixture.CalculateHeatingValue(
+        comp=gerg2008_composition, hhv=True, parameter="volume"
+    )
     molarmass = gas_mixture.MolarMass
     molardensity = gas_mixture.MolarDensity
-    calculated_heating_value = CalculateHeatingValue_numba(MolarMass=molarmass, MolarDensity=molardensity, comp=gerg2008_composition, hhv=True, parameter="volume")
+    calculated_heating_value = CalculateHeatingValue_numba(
+        MolarMass=molarmass,
+        MolarDensity=molardensity,
+        comp=gerg2008_composition,
+        hhv=True,
+        parameter="volume",
+    )
 
     # assert_almost_equal(calculated_heating_value, expected_heating_value, decimal=5)
-    np.testing.assert_allclose(calculated_heating_value, expected_heating_value, rtol=1e-5)
+    np.testing.assert_allclose(
+        calculated_heating_value, expected_heating_value, rtol=1e-5
+    )
+
 
 # def test_convert_composition_gerg():
 #     """
@@ -101,23 +156,69 @@ def test_heating_value():
 
 def test_molarmass_gerg():
     """
-        Test the numba version of the MolarMassGERG method of GasMixtureGERG2008 class.
+    Test the numba version of the MolarMassGERG method of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015,
-                  0.00009, 0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Calculate the expected molar mass manually based on the given mixture
     expected_molar_mass = gas_mixture.MolarMassGERG()
@@ -129,23 +230,69 @@ def test_molarmass_gerg():
 
 def test_pressure_gerg():
     """
-        Test the numba version of the PressureGERG method of GasMixtureGERG2008 class.
+    Test the numba version of the PressureGERG method of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Define the density input for PressureGERG method
     d = 10
@@ -162,29 +309,75 @@ def test_pressure_gerg():
 
 def test_density_gerg():
     """
-        Test the numba version of the DensityGERG function of GasMixtureGERG2008 class.
+    Test the numba version of the DensityGERG function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Define the density input for PressureGERG method
     d = gas_mixture.MolarDensity
 
     # Expected value calculated from the function call
-    #expected_values = gas_mixture.PressureGERG(d)
+    # expected_values = gas_mixture.PressureGERG(d)
     _, _, expected_values = gas_mixture.DensityGERG()
 
     # AR = np.array(gas_mixture.AlpharGERG(itau=0, idelta=0, D=d))
@@ -192,29 +385,77 @@ def test_density_gerg():
     Temp = gas_mixture.T
 
     # Test the DensityGERG function with iFlag=0 (default)
-    _, _,calculated_values = DensityGERG_numba(Press, Temp, b, iFlag=0)  # Calling the function without any argument
+    _, _, calculated_values = DensityGERG_numba(
+        Press, Temp, b, iFlag=0
+    )  # Calling the function without any argument
     assert_allclose(expected_values, calculated_values)
 
 
 def test_alpha0_gerg():
     """
-        Test the numba version of the Alpha0GERG() function of GasMixtureGERG2008 class.
+    Test the numba version of the Alpha0GERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Expected value calculated from the function call
     # a0(0) - Ideal gas Helmholtz energy (all dimensionless [i.e., divided by RT])
@@ -233,23 +474,69 @@ def test_alpha0_gerg():
 
 def test_reducing_parameters_gerg():
     """
-        Test the numba version of the ReducingParametersGERG() function of GasMixtureGERG2008 class.
+    Test the numba version of the ReducingParametersGERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015,
-                  0.00009, 0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Expected value calculated from the function call
     expected_reducingparametersgerg = gas_mixture.ReducingParametersGERG()
@@ -263,23 +550,69 @@ def test_reducing_parameters_gerg():
 
 def test_pseudo_critical_point_gerg():
     """
-            Test the numba version of the PseudoCriticalPointGERG() function of GasMixtureGERG2008 class.
+    Test the numba version of the PseudoCriticalPointGERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015,
-                  0.00009, 0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Expected value calculated from the function call
     expected_pseudocriticalpointgerg = gas_mixture.PseudoCriticalPointGERG()
@@ -291,23 +624,69 @@ def test_pseudo_critical_point_gerg():
 
 def test_alphar_gerg():
     """
-            Test the numba version of the AlpharGERG() function of GasMixtureGERG2008 class.
+    Test the numba version of the AlpharGERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Expected value calculated from the function call
     #                         ar(0,0) - Residual Helmholtz energy (dimensionless, =a/RT)
@@ -335,41 +714,88 @@ def test_PropertiesGERG():
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
     b = np.array(
-        [0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
-    expected_PropertiesGERG = [gas_mixture.MolarMass,
-                                gas_mixture.MolarDensity,
-                                gas_mixture.Z,
-                                gas_mixture.dPdD,
-                                gas_mixture.d2PdD2,
-                                gas_mixture.dPdT,
-                                gas_mixture.energy,
-                                gas_mixture.enthalpy,
-                                gas_mixture.entropy,
-                                gas_mixture.Cv_molar,
-                                gas_mixture.Cp_molar,
-                                gas_mixture.Cv,
-                                gas_mixture.Cp,
-                                gas_mixture.c,
-                                gas_mixture.gibbs_energy,
-                                gas_mixture.JT,
-                                gas_mixture.isentropic_exponent,
-                                gas_mixture.rho,
-                                gas_mixture.SG,
-                                gas_mixture.R_specific]
+    expected_PropertiesGERG = [
+        gas_mixture.MolarMass,
+        gas_mixture.MolarDensity,
+        gas_mixture.Z,
+        gas_mixture.dPdD,
+        gas_mixture.d2PdD2,
+        gas_mixture.dPdT,
+        gas_mixture.energy,
+        gas_mixture.enthalpy,
+        gas_mixture.entropy,
+        gas_mixture.Cv_molar,
+        gas_mixture.Cp_molar,
+        gas_mixture.Cv,
+        gas_mixture.Cp,
+        gas_mixture.c,
+        gas_mixture.gibbs_energy,
+        gas_mixture.JT,
+        gas_mixture.isentropic_exponent,
+        gas_mixture.rho,
+        gas_mixture.SG,
+        gas_mixture.R_specific,
+    ]
 
     # Call the PropertiesGERG function
     calculated_PropertiesGERG = PropertiesGERG_numba(gas_mixture.T, gas_mixture.P, b)

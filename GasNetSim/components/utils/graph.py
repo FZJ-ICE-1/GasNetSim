@@ -7,7 +7,9 @@
 #     Last change by yifei
 #    *****************************************************************************
 from collections import Counter
+
 import networkx as nx
+
 from ..network import Network
 
 

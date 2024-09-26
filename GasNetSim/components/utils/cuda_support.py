@@ -6,13 +6,14 @@
 #     Last change on 9/4/24, 6:56 AM
 #     Last change by yifei
 #    *****************************************************************************
-import logging
+
+import subprocess
 
 import numpy
 import numpy as np
 import scipy
 import scipy.sparse.linalg as splinalg
-import subprocess
+
 
 # try:
 #     import cupy as cp

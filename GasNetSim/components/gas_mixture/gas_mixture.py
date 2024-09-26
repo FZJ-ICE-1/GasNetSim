@@ -15,6 +15,7 @@ from scipy.constants import atm, zero_Celsius
 from .GERG2008.gerg2008 import *
 from .GERG2008.gerg2008_constants import *
 from .GERG2008.gerg2008 import convert_to_gerg2008_composition
+
 # from .heating_value import calc_heating_value
 
 
@@ -22,7 +23,10 @@ class GasMixture:
     """
     Class for gas mixture properties
     """
-    def __init__(self, pressure, temperature, composition: OrderedDict, method='GERG-2008'):
+
+    def __init__(
+        self, pressure, temperature, composition: OrderedDict, method="GERG-2008"
+    ):
         """
 
         :param pressure:
@@ -52,13 +56,15 @@ class GasMixture:
 
     def update_gas_mixture(self):
         if self.method == "GERG-2008":
-            self.gerg2008_mixture = GasMixtureGERG2008(P_Pa=self.pressure,
-                                                       T_K=self.temperature,
-                                                       composition=self.eos_composition_tmp)
+            self.gerg2008_mixture = GasMixtureGERG2008(
+                P_Pa=self.pressure,
+                T_K=self.temperature,
+                composition=self.eos_composition_tmp,
+            )
         elif self.method == "PREOS":
-            self.thermo_mixture = Mixture(P=self.pressure,
-                                          T=self.temperature,
-                                          zs=self.eos_composition_tmp)
+            self.thermo_mixture = Mixture(
+                P=self.pressure, T=self.temperature, zs=self.eos_composition_tmp
+            )
 
     @property
     def compressibility(self):
@@ -66,7 +72,9 @@ class GasMixture:
             if self.thermo_mixture.Z is not None:
                 z = self.thermo_mixture.Z
             else:
-                logging.warning("Compressibility is not available, using the Z for gas!")
+                logging.warning(
+                    "Compressibility is not available, using the Z for gas!"
+                )
                 z = self.thermo_mixture.Zg
             return self.thermo_mixture.Z
         elif self.method == "GERG-2008":
@@ -78,7 +86,9 @@ class GasMixture:
             if self.thermo_mixture.SG is not None:
                 specific_gravity = self.thermo_mixture.SG
             else:
-                logging.warning("Specific gravity is not available, using the SG for gas!")
+                logging.warning(
+                    "Specific gravity is not available, using the SG for gas!"
+                )
                 specific_gravity = self.thermo_mixture.SGg
             return specific_gravity
         elif self.method == "GERG-2008":
@@ -101,9 +111,7 @@ class GasMixture:
     @property
     def standard_density(self):
         if self.method == "PREOS":
-            return Mixture(P=1*atm,
-                           T=15+zero_Celsius,
-                           zs=self.composition).rho
+            return Mixture(P=1 * atm, T=15 + zero_Celsius, zs=self.composition).rho
 
         elif self.method == "GERG-2008":
             return self.gerg2008_mixture.standard_density

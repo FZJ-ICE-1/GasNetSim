@@ -17,9 +17,19 @@ class Node:
     Class to formulate gas transmission network nodes.
     """
 
-    def __init__(self, node_index, volumetric_flow=None, energy_flow=None, pressure_pa=None,
-                 temperature=288.15, altitude=0, gas_composition=None, node_type='demand',
-                 longitude=None, latitude=None):
+    def __init__(
+        self,
+        node_index,
+        volumetric_flow=None,
+        energy_flow=None,
+        pressure_pa=None,
+        temperature=288.15,
+        altitude=0,
+        gas_composition=None,
+        node_type="demand",
+        longitude=None,
+        latitude=None,
+    ):
         """
         Initial method
         :param node_index: Node index
@@ -52,7 +62,7 @@ class Node:
         if node_type is not None:
             self.node_type = node_type
         else:
-            self.node_type = 'demand'
+            self.node_type = "demand"
         self.longitude = longitude
         self.latitude = latitude
         # flow type
@@ -62,14 +72,16 @@ class Node:
         #     self.flow_type = 'volumetric'
 
         try:
-            self.gas_mixture = GasMixture(composition=self.gas_composition,
-                                          temperature=self.temperature,
-                                          pressure=self.pressure)
+            self.gas_mixture = GasMixture(
+                composition=self.gas_composition,
+                temperature=self.temperature,
+                pressure=self.pressure,
+            )
         except (TypeError, AttributeError):
             # If pressure or temperature is missing for some nodes
-            self.gas_mixture = GasMixture(composition=self.gas_composition,
-                                          temperature=288.15,
-                                          pressure=50 * bar)
+            self.gas_mixture = GasMixture(
+                composition=self.gas_composition, temperature=288.15, pressure=50 * bar
+            )
 
         # self.flow = flow
         self.volumetric_flow = volumetric_flow
@@ -120,7 +132,9 @@ class Node:
         """
         # HHV = calc_heating_value(self.gas_mixture)
         # HHV = self.gas_mixture.heating_value(hhv=True, parameter="mass")
-        self.volumetric_flow = self.energy_flow / self.gas_mixture.HHV_J_per_sm3 * 1e6  # sm3/s
+        self.volumetric_flow = (
+            self.energy_flow / self.gas_mixture.HHV_J_per_sm3 * 1e6
+        )  # sm3/s
 
     def convert_volumetric_to_energy_flow(self):
         """
@@ -128,7 +142,9 @@ class Node:
         :return:
         """
         # HHV = self.gas_mixture.heating_value(hhv=True, parameter="mass")
-        self.energy_flow = self.volumetric_flow * self.gas_mixture.HHV_J_per_sm3 / 1e6  # MJ/s
+        self.energy_flow = (
+            self.volumetric_flow * self.gas_mixture.HHV_J_per_sm3 / 1e6
+        )  # MJ/s
 
 
 if __name__ == "__main__":

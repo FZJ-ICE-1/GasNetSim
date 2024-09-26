@@ -8,17 +8,16 @@
 #    *****************************************************************************
 import copy
 import math
-from pyparsing import col
-from collections import OrderedDict
-from scipy import sparse
+
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
-from timeit import default_timer as timer
-from numba import njit, float64, boolean
-import networkx as nx
+from scipy import sparse
 
+from .cuda_support import create_matrix_of_zeros
 from ..pipeline import Pipeline
+
 
 # try:
 #     import cupy as cp
@@ -27,17 +26,22 @@ from ..pipeline import Pipeline
 #     # logging.warning(f"CuPy is not installed or not available!")
 #     print(f"CuPy is not installed or not available!")
 
-from .cuda_support import create_matrix_of_zeros
 
-
-def create_connection_matrix(n_nodes: int, components: dict, component_type: int,
-                             use_cuda=False, sparse_matrix: bool = False):
+def create_connection_matrix(
+    n_nodes: int,
+    components: dict,
+    component_type: int,
+    use_cuda=False,
+    sparse_matrix: bool = False,
+):
     row_ind = list()
     col_ind = list()
     data = list()
 
     if not sparse_matrix:
-        cnx = create_matrix_of_zeros(n_nodes, use_cuda=use_cuda, sparse_matrix=sparse_matrix)
+        cnx = create_matrix_of_zeros(
+            n_nodes, use_cuda=use_cuda, sparse_matrix=sparse_matrix
+        )
 
     for comp in components.values():
         i = comp.inlet_index - 1
@@ -106,14 +110,21 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
 
     if method == "batch_tracking":
         # Batch-tracking
-        batch_location_history += time_step * velocity  # Update batch head compositions and locations
+        batch_location_history += (
+            time_step * velocity
+        )  # Update batch head compositions and locations
         batch_location_history = np.append(batch_location_history, 0)
         composition_history = np.append(composition_history, inflow_composition)
 
         # Update outflow composition
-        while abs(batch_location_history[0]) >= length:  # if the head of a batch reached the end of the pipeline
+        while (
+            abs(batch_location_history[0]) >= length
+        ):  # if the head of a batch reached the end of the pipeline
             outflow_composition = composition_history[0]
-            composition_history, batch_location_history = composition_history[1:], batch_location_history[1:]
+            composition_history, batch_location_history = (
+                composition_history[1:],
+                batch_location_history[1:],
+            )
 
         # update connection composition and batch location history
         connection.composition_history = composition_history
@@ -140,8 +151,8 @@ def create_branch_flow_matrix(nodes, connections, use_cuda=False):
 
     _branch_flow_matrix = np.zeros((n_edges, n_nodes))
     for _i, _connection in connections.items():
-        _branch_flow_matrix[_i][_connection.inlet_index-1] = - _connection.flow_rate
-        _branch_flow_matrix[_i][_connection.outlet_index-1] = _connection.flow_rate
+        _branch_flow_matrix[_i][_connection.inlet_index - 1] = -_connection.flow_rate
+        _branch_flow_matrix[_i][_connection.outlet_index - 1] = _connection.flow_rate
     return _branch_flow_matrix
 
 
@@ -150,7 +161,12 @@ def create_directed_graph_using_flow_directions(pipelines):
     edge_index = {}
     for i, pipeline in pipelines.items():
         if pipeline.flow_velocity is None:
-            G.add_edge(pipeline.inlet_index, pipeline.outlet_index, flow_rate=1., composition=[])
+            G.add_edge(
+                pipeline.inlet_index,
+                pipeline.outlet_index,
+                flow_rate=1.0,
+                composition=[],
+            )
             edge_index[(pipeline.inlet_index, pipeline.outlet_index)] = i
         elif pipeline.flow_velocity >= 0:
             G.add_edge(pipeline.inlet_index, pipeline.outlet_index)
@@ -163,11 +179,14 @@ def create_directed_graph_using_flow_directions(pipelines):
 
 def topological_sort_of_nodes(graph):
     if not nx.is_directed_acyclic_graph(graph):
-        raise ValueError("The graph must be a Directed Acyclic Graph (DAG) to perform topological sorting.")
+        raise ValueError(
+            "The graph must be a Directed Acyclic Graph (DAG) to perform topological sorting."
+        )
 
     nodes_topological_order = list(nx.topological_sort(graph))
 
     return nodes_topological_order
+
 
 def topological_sort_of_edges(graph, edge_index):
     edge_indices_order = []
@@ -177,17 +196,24 @@ def topological_sort_of_edges(graph, edge_index):
             edge_indices_order.append(edge_index[(node, successor)])
     return edge_indices_order
 
+
 def create_nodal_composition_matrix(nodes, connections, use_cuda=False):
     _branch_flow_matrix = create_branch_flow_matrix(nodes, connections)
 
     _nodal_inflow_matrix = np.where(_branch_flow_matrix > 0, _branch_flow_matrix, 0)
 
-    _branch_outflow_composition = np.array([c.outflow_composition for c in connections.values()])
-    _nodal_inflow_composition = np.dot(_nodal_inflow_matrix.T, _branch_outflow_composition)
+    _branch_outflow_composition = np.array(
+        [c.outflow_composition for c in connections.values()]
+    )
+    _nodal_inflow_composition = np.dot(
+        _nodal_inflow_matrix.T, _branch_outflow_composition
+    )
 
-    _nodal_inflow_vector = np.sum(np.where(_branch_flow_matrix > 0, _branch_flow_matrix, 0), axis=0)
+    _nodal_inflow_vector = np.sum(
+        np.where(_branch_flow_matrix > 0, _branch_flow_matrix, 0), axis=0
+    )
 
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         _nodal_composition_matrix = _nodal_inflow_composition.T / _nodal_inflow_vector
     # _nodal_composition_matrix = _nodal_inflow_composition.T / _nodal_inflow_vector
 
@@ -202,10 +228,14 @@ def allclose_with_nan(a, b, rtol=1e-03, atol=1e-04):
     return np.all(nan_equal | close_equal)
 
 
-def calculate_nodal_inflow_states(nodes, connections, mapping_connections,
-                                  tracking_method="simple_mixing",
-                                  use_cuda=False,
-                                  time_step=0):
+def calculate_nodal_inflow_states(
+    nodes,
+    connections,
+    mapping_connections,
+    tracking_method="simple_mixing",
+    use_cuda=False,
+    time_step=0,
+):
     to_update = True
     _prev_nodal_composition_matrix = np.zeros((21, (len(nodes))))
 
@@ -218,11 +248,15 @@ def calculate_nodal_inflow_states(nodes, connections, mapping_connections,
     while to_update:
         # _count_nodal_inflow_iterations += 1
         for i in edge_orders:
-            pipelines[i] = gas_composition_tracking(pipelines[i], time_step=time_step, method=tracking_method)
+            pipelines[i] = gas_composition_tracking(
+                pipelines[i], time_step=time_step, method=tracking_method
+            )
 
         _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
 
-        nodes = update_temporary_nodal_gas_mixture_properties(nodes, _nodal_composition_matrix)
+        nodes = update_temporary_nodal_gas_mixture_properties(
+            nodes, _nodal_composition_matrix
+        )
         if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
             to_update = False
         else:
@@ -231,6 +265,7 @@ def calculate_nodal_inflow_states(nodes, connections, mapping_connections,
     # print(_count_nodal_inflow_iterations)
 
     return _nodal_composition_matrix
+
 
 def update_temporary_nodal_gas_mixture_properties(nodes, nodal_composition_matrix):
     """
@@ -243,7 +278,9 @@ def update_temporary_nodal_gas_mixture_properties(nodes, nodal_composition_matri
         if np.any(np.isnan(nodal_composition_matrix[:, _i])):  # No inflow
             pass
         else:
-            nodes[_i+1].gas_mixture.eos_composition_tmp = nodal_composition_matrix[:, _i]
+            nodes[_i + 1].gas_mixture.eos_composition_tmp = nodal_composition_matrix[
+                :, _i
+            ]
             # nodes[_i+1].gas_mixture.update_gas_mixture()
     return nodes
 
@@ -263,20 +300,22 @@ def calculate_flow_matrix(network, pressure_bar):
     for connection in connections.values():
         i = connection.inlet_index - 1
         j = connection.outlet_index - 1
-        connection.inlet = nodes[i+1]
-        connection.outlet = nodes[j+1]
+        connection.inlet = nodes[i + 1]
+        connection.outlet = nodes[j + 1]
 
         flow_direction = connection.determine_flow_direction()
 
-        p1 = nodes[i+1].pressure
-        p2 = nodes[j+1].pressure
+        p1 = nodes[i + 1].pressure
+        p2 = nodes[j + 1].pressure
 
         slope_correction = connection.calc_pipe_slope_correction()
         temp = connection.calculate_coefficient_for_iteration()
 
-        flow_rate = flow_direction * abs(p1 ** 2 - p2 ** 2 - slope_correction) ** (1 / 2) * temp
+        flow_rate = (
+            flow_direction * abs(p1**2 - p2**2 - slope_correction) ** (1 / 2) * temp
+        )
 
-        flow_mat[i][j] = - flow_rate
+        flow_mat[i][j] = -flow_rate
         flow_mat[j][i] = flow_rate
 
     return flow_mat
@@ -286,7 +325,11 @@ def calculate_flow_vector(network, pressure_bar, target_flow):
     flow_matrix = calculate_flow_matrix(network, pressure_bar)
     n_nodes = len(network.nodes.values())
     nodal_flow = np.dot(flow_matrix, np.ones(n_nodes))
-    nodal_flow = [nodal_flow[i] for i in range(len(nodal_flow)) if i + 1 not in network.non_junction_nodes]
+    nodal_flow = [
+        nodal_flow[i]
+        for i in range(len(nodal_flow))
+        if i + 1 not in network.non_junction_nodes
+    ]
     delta_flow = target_flow - nodal_flow
 
     # delta_flow = [delta_flow[i] for i in range(len(delta_flow)) if i + 1 not in network.non_junction_nodes]
@@ -297,7 +340,7 @@ def plot_network_demand_distribution(network):
     nodes = network.nodes.values()
     node_demand = [n.volumetric_flow for n in nodes if n.volumetric_flow is not None]
     sns.histplot(data=node_demand, stat="probability")
-    plt.xlim((min(node_demand)-10, max(node_demand) + 10))
+    plt.xlim((min(node_demand) - 10, max(node_demand) + 10))
     plt.xlabel("Nodal volumetric flow demand [sm^3/s]")
     plt.show()
     return None
@@ -323,15 +366,15 @@ def check_all_off_diagonal_elements(a, criterion):
         for j in range(a.shape[1]):
             if i != j:
                 if criterion == "zero":
-                    res = (a[i][j] == 0)
+                    res = a[i][j] == 0
                 elif criterion == "positive":
-                    res = (a[i][j] > 0)
+                    res = a[i][j] > 0
                 elif criterion == "non-negative":
-                    res = (a[i][j] >= 0)
+                    res = a[i][j] >= 0
                 elif criterion == "negative":
-                    res = (a[i][j] < 0)
+                    res = a[i][j] < 0
                 elif criterion == "non-positive":
-                    res = (a[i][j] <= 0)
+                    res = a[i][j] <= 0
                 else:
                     print("Check the given criterion!")
                     return False

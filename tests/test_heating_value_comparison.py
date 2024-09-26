@@ -6,12 +6,13 @@
 #     Last change on 8/21/24, 11:12 AM
 #     Last change by yifei
 #    *****************************************************************************
+import cantera as ct
+import pandas as pd
 from numpy.testing import assert_almost_equal
 from scipy.constants import bar
-import pandas as pd
 
 from GasNetSim.components.gas_mixture.GERG2008 import *
-import cantera as ct
+
 
 def heating_value(fuel):
     """Returns the LHV and HHV for the specified fuel"""
@@ -34,9 +35,16 @@ def heating_value(fuel):
     HHV = -(h2 - h1 + (h_liquid - h_gas) * Y_H2O) / Y_fuel
     return LHV, HHV
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     fuels = ["CH4", "C2H6", "C3H8", "H2", "CO"]
-    molar_density = [0.6484926588314163, 1.2228248480248802, 1.8085351993461924, 0.04065274708618872 * 2, 1.1308810162414191]
+    molar_density = [
+        0.6484926588314163,
+        1.2228248480248802,
+        1.8085351993461924,
+        0.04065274708618872 * 2,
+        1.1308810162414191,
+    ]
     gas = ct.Solution("gri30.yaml")
     water = ct.Water()
     # Set liquid water state, with vapor fraction x = 0
@@ -61,10 +69,18 @@ if __name__ == '__main__':
     HHV_gerg2008_mass = []
     LHV_gerg2008_vol = []
     HHV_gerg2008_vol = []
-    gas_comp = {'methane': 1, 'ethane': 1, 'propane': 1, 'hydrogen': 1, 'carbon monoxide': 1}
+    gas_comp = {
+        "methane": 1,
+        "ethane": 1,
+        "propane": 1,
+        "hydrogen": 1,
+        "carbon monoxide": 1,
+    }
     for key, value in gas_comp.items():
         x = convert_to_gerg2008_composition(OrderedDict({key: value}))
-        gas_mixture = GasMixtureGERG2008(P_Pa=1 * bar, T_K=298, composition=x, use_numba=True)
+        gas_mixture = GasMixtureGERG2008(
+            P_Pa=1 * bar, T_K=298, composition=x, use_numba=True
+        )
         HHV = gas_mixture.HHV_J_per_kg
         LHV = gas_mixture.LHV_J_per_kg
         LHV_gerg2008_mass.append(LHV)
@@ -79,34 +95,42 @@ if __name__ == '__main__':
     HHV_gerg2008_vol = [x for x in HHV_gerg2008_vol]
 
     LHV_df_mass = pd.DataFrame(
-        {'molecule': fuels,
-         'gerg2008 [LHV MJ/kg]': LHV_gerg2008_mass,
-         'cantera [LHV MJ/kg]': LHV_cantera_mass,
-         })
+        {
+            "molecule": fuels,
+            "gerg2008 [LHV MJ/kg]": LHV_gerg2008_mass,
+            "cantera [LHV MJ/kg]": LHV_cantera_mass,
+        }
+    )
 
     print(LHV_df_mass)
 
     HHV_df_mass = pd.DataFrame(
-        {'molecule': fuels,
-         'gerg2008 [HHV MJ/kg]': HHV_gerg2008_mass,
-         'cantera [HHV MJ/kg]': HHV_cantera_mass
-         })
+        {
+            "molecule": fuels,
+            "gerg2008 [HHV MJ/kg]": HHV_gerg2008_mass,
+            "cantera [HHV MJ/kg]": HHV_cantera_mass,
+        }
+    )
 
     print(HHV_df_mass)
 
     LHV_df_vol = pd.DataFrame(
-        {'molecule': fuels,
-         'gerg2008 [LHV MJ/m3]': LHV_gerg2008_vol,
-         'cantera [LHV MJ/m3]': LHV_cantera_vol,
-         })
+        {
+            "molecule": fuels,
+            "gerg2008 [LHV MJ/m3]": LHV_gerg2008_vol,
+            "cantera [LHV MJ/m3]": LHV_cantera_vol,
+        }
+    )
 
     print(LHV_df_vol)
 
     HHV_df_vol = pd.DataFrame(
-        {'molecule': fuels,
-         'gerg2008 [HHV MJ/m3]': HHV_gerg2008_vol,
-         'cantera [HHV MJ/m3]': HHV_cantera_vol,
-         })
+        {
+            "molecule": fuels,
+            "gerg2008 [HHV MJ/m3]": HHV_gerg2008_vol,
+            "cantera [HHV MJ/m3]": HHV_cantera_vol,
+        }
+    )
 
     print(HHV_df_vol)
 
@@ -116,8 +140,12 @@ if __name__ == '__main__':
     assert_almost_equal(LHV_cantera_vol, LHV_gerg2008_vol, decimal=2)
     assert_almost_equal(HHV_cantera_vol, HHV_gerg2008_vol, decimal=2)
 
-    cantera_list = LHV_cantera_mass + HHV_cantera_mass + LHV_cantera_vol + HHV_cantera_vol
-    gerg2008_list = LHV_gerg2008_mass + HHV_gerg2008_mass + LHV_gerg2008_vol + HHV_gerg2008_vol
+    cantera_list = (
+        LHV_cantera_mass + HHV_cantera_mass + LHV_cantera_vol + HHV_cantera_vol
+    )
+    gerg2008_list = (
+        LHV_gerg2008_mass + HHV_gerg2008_mass + LHV_gerg2008_vol + HHV_gerg2008_vol
+    )
     assert_almost_equal(cantera_list, gerg2008_list, decimal=2)
 
     # print("fuel   LHV (MJ/kg)   HHV (MJ/kg)")
