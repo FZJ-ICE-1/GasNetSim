@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 10/22/24, 12:35 PM
+#     Last change on 10/22/24, 4:35 PM
 #     Last change by yifei
 #    *****************************************************************************
 from collections import OrderedDict
@@ -209,6 +209,66 @@ def create_network_from_folder(path_to_folder: Path, conversion_factor=1.0) -> N
                 else:
                     network_components[component_key + "s"] = read_function(file, nodes)
                 break
+
+    # Create and return the Network object
+    return Network(
+        nodes=network_components["nodes"],
+        pipelines=network_components["pipelines"],
+        compressors=network_components["compressors"],
+        resistances=network_components["resistances"],
+        linear_resistances=network_components["linear_resistances"],
+        shortpipes=network_components["shortpipes"],
+    )
+
+
+def create_network_from_files(
+    component_files: dict[str, Path], conversion_factor=1.0
+) -> Network:
+    """
+    Create a Network object from specified component CSV files.
+
+    :param component_files: A dictionary mapping component names (e.g., 'nodes', 'pipelines') to file paths.
+    :param conversion_factor: Conversion factor for pipeline data.
+    :return: A Network object.
+    """
+    # Ensure nodes file is provided
+    nodes_file = component_files.get("nodes")
+    if nodes_file is None:
+        raise ValueError("Nodes file is required to create the network.")
+
+    # Read nodes
+    nodes = read_nodes(nodes_file)
+
+    # Initialize network components
+    network_components = {
+        "nodes": nodes,
+        "pipelines": None,
+        "compressors": None,
+        "resistances": None,
+        "shortpipes": None,
+        "linear_resistances": None,
+    }
+
+    # Mapping of component names to their corresponding read functions
+    read_functions = {
+        "pipelines": read_pipelines,
+        "compressors": read_compressors,
+        "resistances": read_resistances,
+        "linear_resistances": read_linear_resistances,
+        "shortpipes": read_shortpipes,
+    }
+
+    # Read other components if provided
+    for component_name, read_function in read_functions.items():
+        if component_name in component_files:
+            if component_name == "pipelines":
+                network_components[component_name] = read_function(
+                    component_files[component_name], nodes, conversion_factor
+                )
+            else:
+                network_components[component_name] = read_function(
+                    component_files[component_name], nodes
+                )
 
     # Create and return the Network object
     return Network(
