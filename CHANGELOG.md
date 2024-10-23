@@ -10,11 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Tutorials implemented using Binder
+- Function to create network using files
+- Use `networkx` for topological sort of pipelines and nodes
 
 ### Changed
 
 - Changed the packaging tool from `setuptools` to `poetry`
-- Use `networkx` for topological sort of pipelines and nodes
+- Renamed create_network_from_csv() to create_network_from_folder() for clarity and add FutureWarning
 
 ## v0.1.0
 
