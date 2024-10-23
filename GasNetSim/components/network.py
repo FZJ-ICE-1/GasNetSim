@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/26/24, 8:44 AM
+#     Last change on 10/17/24, 5:24 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -439,10 +439,16 @@ class Network:
         for i in range(len(nodal_flow_init)):
             # TODO change to number of non-reference nodes
             nodes[i + 1].pressure = pressure_init[i]
-            # nodes[i + 1].flow = nodal_flow_init[i]
             nodes[i + 1].volumetric_flow = nodal_flow_init[i]
-            nodes[i + 1].convert_volumetric_to_energy_flow()
             nodes[i + 1].temperature = temperature_init[i]
+            if nodes[i + 1].flow_type == "volumetric":
+                nodes[i + 1].convert_volumetric_to_energy_flow()
+            elif nodes[i + 1].flow_type == "energy":
+                nodes[i + 1].convert_energy_to_volumetric_flow()
+            else:
+                raise (
+                    ValueError("Unknown flow type, can be only volumetric or energy!")
+                )
 
         if pipelines is not None:
             for index, pipe in pipelines.items():
@@ -552,10 +558,18 @@ class Network:
             # TODO change to number of non-reference nodes
             self.nodes[i + 1].pressure = pressure[i]
             self.nodes[i + 1].volumetric_flow = flow[i]
-            self.nodes[i + 1].convert_volumetric_to_energy_flow()
             self.nodes[i + 1].gas_mixture.pressure = self.nodes[i + 1].pressure
             self.nodes[i + 1].gas_mixture.temperature = self.nodes[i + 1].temperature
             self.nodes[i + 1].gas_mixture.update_gas_mixture()
+
+            if self.nodes[i + 1].flow_type == "volumetric":
+                self.nodes[i + 1].convert_volumetric_to_energy_flow()
+            elif self.nodes[i + 1].flow_type == "energy":
+                self.nodes[i + 1].convert_energy_to_volumetric_flow()
+            else:
+                raise (
+                    ValueError("Unknown flow type, can be only volumetric or energy!")
+                )
 
     # def simulation(self, composition_tracking=False):
     #     logging.debug([x.flow for x in self.nodes.values()])
@@ -735,7 +749,16 @@ class Network:
 
             # Update volumetric flow rate target
             for n in self.nodes.values():
-                n.convert_energy_to_volumetric_flow()
+                if n.flow_type == "volumetric":
+                    n.convert_volumetric_to_energy_flow()
+                elif n.flow_type == "energy":
+                    n.convert_energy_to_volumetric_flow()
+                else:
+                    raise (
+                        ValueError(
+                            "Unknown flow type, can be only volumetric or energy!"
+                        )
+                    )
             f_target = list_to_array(
                 [
                     x.volumetric_flow if x.volumetric_flow is not None else 0
@@ -824,7 +847,14 @@ class Network:
 
         for i_node in self.non_junction_nodes:
             self.nodes[i_node].volumetric_flow = nodal_flow[i_node - 1]
-            self.nodes[i_node].convert_volumetric_to_energy_flow()
+            if self.nodes[i_node].flow_type == "volumetric":
+                self.nodes[i_node].convert_volumetric_to_energy_flow()
+            elif self.nodes[i_node].flow_type == "energy":
+                self.nodes[i_node].convert_energy_to_volumetric_flow()
+            else:
+                raise (
+                    ValueError("Unknown flow type, can be only volumetric or energy!")
+                )
 
         for node in self.nodes.values():
             node.gas_mixture.eos_composition = node.gas_mixture.eos_composition_tmp

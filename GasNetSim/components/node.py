@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 8/22/24, 9:34 AM
+#     Last change on 10/17/24, 4:42 PM
 #     Last change by yifei
 #    *****************************************************************************
 from scipy.constants import bar
@@ -27,6 +27,7 @@ class Node:
         altitude=0,
         gas_composition=None,
         node_type="demand",
+        flow_type=None,
         longitude=None,
         latitude=None,
     ):
@@ -66,10 +67,10 @@ class Node:
         self.longitude = longitude
         self.latitude = latitude
         # flow type
-        # if flow_type is not None:
-        #     self.flow_type = flow_type
-        # else:
-        #     self.flow_type = 'volumetric'
+        if flow_type is not None:
+            self.flow_type = flow_type
+        else:
+            self.flow_type = "volumetric"
 
         try:
             self.gas_mixture = GasMixture(
@@ -83,15 +84,15 @@ class Node:
                 composition=self.gas_composition, temperature=288.15, pressure=50 * bar
             )
 
-        # self.flow = flow
         self.volumetric_flow = volumetric_flow
         self.energy_flow = energy_flow
-        if volumetric_flow is not None:
+
+        if self.flow_type == "volumetric" and volumetric_flow is not None:
             try:
                 self.convert_volumetric_to_energy_flow()
             except TypeError:
                 self.energy_flow = None
-        elif energy_flow is not None:
+        elif self.flow_type == "energy" and energy_flow is not None:
             try:
                 self.convert_energy_to_volumetric_flow()
             except TypeError:
