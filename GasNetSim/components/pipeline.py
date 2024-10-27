@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/2/24, 10:31 AM
+#     Last change on 10/28/24, 12:46 AM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -174,7 +174,7 @@ class Pipeline:
             # if np.isnan(reynold_number(diameter=self.diameter, velocity=flow_velocity,
             #                       rho=self.gas_mixture.density, viscosity=self.gas_mixture.viscosity)):
             #     print(self.flow_rate, self.diameter, flow_velocity, self.gas_mixture.density, self.gas_mixture.viscosity)
-            return reynold_number(
+            return reynolds_number(
                 diameter=self.diameter,
                 velocity=flow_velocity,
                 rho=self.gas_mixture.density,
