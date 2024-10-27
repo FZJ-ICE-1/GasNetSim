@@ -3,17 +3,22 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/26/24, 9:16 AM
+#     Last change on 10/25/24, 2:33 PM
 #     Last change by yifei
 #    *****************************************************************************
 import warnings
-
 import numpy as np
 import math
 from scipy.constants import atm
 from scipy.optimize import fsolve
+from numba import njit, float64
 
 
+LAMINAR_FLOW_THRESHOLD = 2100
+AIR_DENSITY = 1.225  # Density of air at standard conditions (kg/m3)
+
+
+@njit(float64(float64, float64, float64, float64))
 def reynold_number(diameter, velocity, rho, viscosity):
     """
     Calculate Reynolds number
@@ -27,6 +32,7 @@ def reynold_number(diameter, velocity, rho, viscosity):
     return (diameter * abs(velocity) * rho) / viscosity
 
 
+@njit(float64(float64, float64, float64, float64))
 def reynold_number_simple(diameter, p, sg, q, viscosity):
     """
     A simplified method to calculate the Reynolds number based on the volumetric flow rate
@@ -41,10 +47,8 @@ def reynold_number_simple(diameter, p, sg, q, viscosity):
     # tb = 288.15  # K
     # return 49.44 * abs(q) * sg * pb / (viscosity * diameter * tb) * (24*3600)
 
-    rho_air = 1.225  # Density of air at standard conditions (kg/m3)
-
     # Calculate density of the gas
-    rho_gas = sg * rho_air * p / atm
+    rho_gas = sg * AIR_DENSITY * p / atm
 
     # Calculate Reynolds number
     re = (4.0 * q * rho_gas) / (math.pi * diameter * viscosity)
@@ -52,6 +56,7 @@ def reynold_number_simple(diameter, p, sg, q, viscosity):
     return re
 
 
+@njit(float64(float64))
 def hagen_poiseuille(N_re):
     """
     Friction factor in Laminar zone can be calculated using Hagen-Poiseuille method
@@ -65,11 +70,13 @@ def hagen_poiseuille(N_re):
     return 64 / N_re
 
 
+@njit(float64(float64, float64))
 def nikuradse(d, epsilon):
     # d *= 1000
     return 1 / (2 * math.log(d / epsilon, 10) + 1.14) ** 2
 
 
+@njit(float64(float64))
 def von_karman_prandtl(N_re):
     """
 
@@ -85,6 +92,7 @@ def von_karman_prandtl(N_re):
     return friction_factor
 
 
+@njit(float64(float64, float64, float64))
 def colebrook_white(epsilon, d, N_re):
     """
 
@@ -105,12 +113,14 @@ def colebrook_white(epsilon, d, N_re):
     return friction_factor
 
 
+@njit(float64(float64, float64, float64))
 def colebrook_white_hofer_approximation(N_re, d, epsilon):
     return (
         -2 * math.log(4.518 / N_re * math.log(N_re / 7, 10) + epsilon / 3.71 / d, 10)
     ) ** (-2)
 
 
+@njit(float64(float64, float64))
 def nikuradse_from_CWH(epsilon, d):
     return (-2 * math.log(epsilon / 3.71 / d)) ** (-2)
 
@@ -121,6 +131,7 @@ def nikuradse_from_CWH(epsilon, d):
 #     return 1/(4 * math.log(_, 10) ** 2)
 
 
+@njit(float64(float64, float64, float64))
 def chen(epsilon, d, N_re):
     # Calculate the intermediate values according to the Chen equation
     _term1 = epsilon / d / 3.7065
@@ -142,12 +153,12 @@ def chen(epsilon, d, N_re):
     return _friction_factor
 
 
+@njit(float64(float64))
 def weymouth(d):
     return 0.0093902 / (d ** (1 / 3))
 
 
 if __name__ == "__main__":
-    import math
     import matplotlib.pyplot as plt
     from scipy.constants import bar
 
