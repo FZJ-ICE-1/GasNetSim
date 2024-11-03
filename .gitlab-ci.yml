@@ -5,7 +5,7 @@
 
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/python/tags/
-image: python:$PYTHON_VERSION  # Change image dynamically depending on Python version.
+#image: python:$PYTHON_VERSION  # Change image dynamically depending on Python version.
 
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
@@ -47,36 +47,31 @@ stages:
 
 test:python39:
   <<: *test_template
-  variables:
-    PYTHON_VERSION: "3.9"
+  image: python:3.9
   tags:
     - python39
 
 test:python310:
   <<: *test_template
-  variables:
-    PYTHON_VERSION: "3.10"
+  image: python:3.10
   tags:
     - python310
 
 test:python311:
   <<: *test_template
-  variables:
-    PYTHON_VERSION: "3.11"
+  image: python:3.11
   tags:
     - python311
 
 test:python312:
   <<: *test_template
-  variables:
-    PYTHON_VERSION: "3.12"
+  image: python:3.12
   tags:
     - python312
 
 test:python313:
   <<: *test_template
-  variables:
-    PYTHON_VERSION: "3.13"
+  image: python:3.13
   tags:
     - python313
 
