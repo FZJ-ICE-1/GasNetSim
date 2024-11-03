@@ -1,6 +1,12 @@
 ![](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/-/raw/main/docs/GasNetSim_Logo.svg)
 
 [//]: # ([![PyPI]&#40;https://badge.fury.io/py/GasNetSim.svg&#41;]&#40;https://badge.fury.io/py/GasNetSim&#41;)
+![Python 3.9](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/badges/main/pipeline.svg?job=test:python39)
+![Python 3.10](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/badges/main/pipeline.svg?job=test:python310)
+![Python 3.11](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/badges/main/pipeline.svg?job=test:python311)
+![Python 3.12](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/badges/main/pipeline.svg?job=test:python312)
+![Python 3.13](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/badges/main/pipeline.svg?job=test:python313)
+
 [![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-370/)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/git/https%3A%2F%2Fjugit.fz-juelich.de%2Fiek-10%2Fpublic%2Fsimulation%2Fgasnetsim/HEAD)
