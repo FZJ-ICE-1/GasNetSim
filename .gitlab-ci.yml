@@ -24,66 +24,70 @@ cache:
 
 stages:
   - test
+  - deploy
 
 # Define a template for testing with different Python versions
 .test_template: &test_template
   stage: test
   before_script:
-    - python --version  # For debugging
+    - python --version
     - python -m pip install --upgrade pip
     - pip install virtualenv
 
     # Create and activate the virtual environment
     - virtualenv venv
     - source venv/bin/activate
-    - pip install poetry  # Install poetry within the virtual environment
-    - poetry --version  # Verify poetry installation
-    - ls -R  # List all files to ensure package files are in place
+    - pip install poetry
+    - poetry install
   script:
-    - pip install -e .
-    - pip install -r ./requirements.txt
-    - pytest -v
+    - pytest -v --junitxml=reports/test-results/results.xml
+  artifacts:
+    paths:
+      - reports/test-results/
 
-# Use YAML anchors to create separate jobs for each Python version dynamically
 test:python39:
   <<: *test_template
   variables:
     PYTHON_VERSION: "3.9"
+  tags:
+    - python39
 
 test:python310:
   <<: *test_template
   variables:
     PYTHON_VERSION: "3.10"
+  tags:
+    - python310
 
 test:python311:
   <<: *test_template
   variables:
     PYTHON_VERSION: "3.11"
+  tags:
+    - python311
 
 test:python312:
   <<: *test_template
   variables:
     PYTHON_VERSION: "3.12"
+  tags:
+    - python312
 
 test:python313:
   <<: *test_template
   variables:
     PYTHON_VERSION: "3.13"
+  tags:
+    - python313
 
-
-#  artifacts:
-#    paths:
-#      - dist/*.whl
-
-# pages:
-#   script:
-#     - pip install sphinx sphinx-rtd-theme
-#     - cd doc
-#     - make html
-#     - mv build/html/ ../public/
-#   artifacts:
-#     paths:
-#       - public
-#   rules:
-#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
+pages:
+  script:
+    - pip install sphinx sphinx-rtd-theme
+    - cd doc
+    - make html
+    - mv build/html/ ../public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
