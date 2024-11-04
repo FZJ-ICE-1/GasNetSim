@@ -30,6 +30,7 @@ stages:
 # Pre-commit job
 precommit:
   stage: pre-commit
+  image: python:3.12
   before_script:
     - python -m pip install --upgrade pip
     - pip install virtualenv
