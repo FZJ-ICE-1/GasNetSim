@@ -5,7 +5,7 @@
 
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/python/tags/
-#image: python:$PYTHON_VERSION  # Change image dynamically depending on Python version.
+image: python:$PYTHON_VERSION  # Change image dynamically depending on Python version.
 
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
@@ -23,8 +23,23 @@ cache:
     - venv/
 
 stages:
+  - pre-commit
   - test
   - deploy
+
+# Pre-commit job
+precommit:
+  stage: pre-commit
+  before_script:
+    - python -m pip install --upgrade pip
+    - pip install virtualenv
+    # Create and activate virtual environment
+    - virtualenv venv
+    - source venv/bin/activate
+    - pip install pre-commit poetry  # Install pre-commit and Poetry
+  script:
+    - pre-commit run poetry-export --all-files  # Run only the poetry-export hook
+
 
 # Define a template for testing with different Python versions
 .test_template: &test_template
@@ -41,39 +56,35 @@ stages:
     - poetry install
   script:
     - pytest -v --junitxml=reports/test-results/results.xml
-  artifacts:
-    paths:
-      - reports/test-results/
+#  artifacts:
+#    paths:
+#      - reports/test-results/
 
 test:python39:
   <<: *test_template
-  image: python:3.9
-#  tags:
-#    - python39
+  variables:
+    PYTHON_VERSION: "3.9"
 
 test:python310:
   <<: *test_template
-  image: python:3.10
-#  tags:
-#    - python310
+  variables:
+    PYTHON_VERSION: "3.10"
 
 test:python311:
   <<: *test_template
-  image: python:3.11
-#  tags:
-#    - python311
+  variables:
+    PYTHON_VERSION: "3.11"
 
 test:python312:
   <<: *test_template
-  image: python:3.12
-#  tags:
-#    - python312
+  variables:
+    PYTHON_VERSION: "3.12"
 
 test:python313:
   <<: *test_template
-  image: python:3.13
-#  tags:
-#    - python313
+  variables:
+    PYTHON_VERSION: "3.13"
+
 
 #pages:
 #  script:
