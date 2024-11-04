@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "GasNetSim"
-version = "0.1.1"
+version = "0.1.0"
 description = "A tool for gas network steady-state simulation."
 authors = ["ICE-1: Energy Systems Engineering, Forschungszentrum Jülich GmbH <yifei.lu@fz-juelich.de>"]
 maintainers = ["Yifei Lu <yifei.lu@fz-juelich.de>"]
@@ -9,6 +9,9 @@ license = "MPL-2.0"
 keywords = ["gas network", "simulation", "energy systems"]
 classifiers = [
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering"
@@ -17,7 +20,7 @@ classifiers = [
 packages = [{ include = "GasNetSim" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9, <3.13"
 numpy = ">=1.19.2"
 matplotlib = ">=3.3.2"
 scipy = ">=1.5.2"

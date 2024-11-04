@@ -1,15 +1,7 @@
 ![](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/-/raw/main/docs/GasNetSim_Logo.svg)
 
-
-
-[![Python 3.9](https://img.shields.io/endpoint?url=https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/badges/dev/pipeline.json&label=Python%203.9)](https://jugit.fz-juelich.de/iek-10/public/simulation/gasnetsim/dev/-/jobs/?job=test:python39)
-[![Python 3.10](https://img.shields.io/endpoint?url=https://gitlab.com/your_username/your_repo/badges/main/pipeline.json&label=Python%203.10)](https://gitlab.com/your_username/your_repo/-/jobs/?job=test:python_3.9)
-[![Python 3.11](https://img.shields.io/endpoint?url=https://gitlab.com/your_username/your_repo/badges/main/pipeline.json&label=Python%203.11)](https://gitlab.com/your_username/your_repo/-/jobs/?job=test:python_3.10)
-[![Python 3.12](https://img.shields.io/endpoint?url=https://gitlab.com/your_username/your_repo/badges/main/pipeline.json&label=Python%203.12)](https://gitlab.com/your_username/your_repo/-/jobs/?job=test:python_3.11)
-
-
-[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-370/)
-[![PyPI](https://badge.fury.io/py/GasNetSim.svg)](https://badge.fury.io/py/GasNetSim)
+[![PyPI version](https://img.shields.io/pypi/v/GasNetSim.svg?color=orange)](https://pypi.org/project/GasNetSim/)
+![Python Versions](https://img.shields.io/badge/python-3.9%20|%203.10%20|%203.11%20|%203.12-blue)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![DOI:10.1109/OSMSES54027.2022.9769148](https://zenodo.org/badge/DOI/10.1109/OSMSES54027.2022.9769148.svg)](https://doi.org/10.1109/OSMSES54027.2022.9769148)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/git/https%3A%2F%2Fjugit.fz-juelich.de%2Fiek-10%2Fpublic%2Fsimulation%2Fgasnetsim/HEAD)

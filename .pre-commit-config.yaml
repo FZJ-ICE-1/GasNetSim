@@ -3,6 +3,8 @@ repos:
     hooks:
       - id: poetry-export
         name: Export requirements.txt from pyproject.toml
-        entry: poetry export -f requirements.txt --output requirements.txt
+        entry: poetry export -f requirements.txt --output requirements.txt --without-hashes
         language: system
+        files: ^pyproject\.toml$
+        pass_filenames: false
         stages: [pre-commit]
