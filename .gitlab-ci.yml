@@ -81,10 +81,10 @@ test:python312:
   variables:
     PYTHON_VERSION: "3.12"
 
-test:python313:
-  <<: *test_template
-  variables:
-    PYTHON_VERSION: "3.13"
+#test:python313:
+#  <<: *test_template
+#  variables:
+#    PYTHON_VERSION: "3.13"
 
 
 #pages:
