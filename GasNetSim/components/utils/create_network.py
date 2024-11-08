@@ -42,6 +42,7 @@ def read_nodes(path_to_file: Path) -> dict[int, Node]:
             altitude=row["altitude_m"],
             gas_composition=row["gas_composition"],
             node_type=row["node_type"],
+            flow_type=row["flow_type"],
             longitude=row.get("longitude"),
             latitude=row.get("latitude"),
         )
