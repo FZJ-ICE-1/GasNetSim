@@ -10,6 +10,7 @@ from scipy.constants import bar
 
 from .gas_mixture.typical_mixture_composition import NATURAL_GAS_gri30
 from .gas_mixture.gas_mixture import GasMixture
+from ..utils.exception import InitializationError
 
 
 class Node:
@@ -99,17 +100,17 @@ class Node:
                 self.volumetric_flow = None
         else:
             if pressure_pa is None:
-                raise InitializationError("Either pressure or flow should be known.")
+                raise InitializationError(f"Either pressure or flow should be known: node {self.index}.")
 
-    # def update_gas_mixture(self):
-    #     try:
-    #         self.gas_mixture = GasMixture(composition=self.get_mole_fraction(),
-    #                                       temperature=self.temperature,
-    #                                       pressure=self.pressure)
-    #     except (TypeError, AttributeError):
-    #         self.gas_mixture = GasMixture(composition=NATURAL_GAS_gri30,
-    #                                       temperature=288.15,
-    #                                       pressure=50 * bar)
+    def update_gas_mixture(self):
+        try:
+            self.gas_mixture = GasMixture(composition=self.get_mole_fraction(),
+                                          temperature=self.temperature,
+                                          pressure=self.pressure)
+        except (TypeError, AttributeError):
+            self.gas_mixture = GasMixture(composition=NATURAL_GAS_gri30,
+                                          temperature=288.15,
+                                          pressure=50 * bar)
 
     def get_mole_fraction(self):
         """
