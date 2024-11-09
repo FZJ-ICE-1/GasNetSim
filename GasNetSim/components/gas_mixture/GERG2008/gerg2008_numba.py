@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 8/14/24, 2:59 PM
+#     Last change on 11/10/24, 12:39 AM
 #     Last change by yifei
 #    *****************************************************************************
 import math
@@ -863,3 +863,138 @@ def PropertiesGERG_numba(T, P, x):
         molar_mass / air_molar_mass,
         R / molar_mass,
     )
+
+
+# Assuming necessary helper functions like MolarMassGERG_numba, DensityGERG_numba, etc., are available
+@njit(float64(float64[:]))
+def molar_mass_numba(x):
+    return MolarMassGERG_numba(x)
+
+
+@njit(float64(float64, float64, float64[:]))
+def density_numba(P, T, x):
+    ierr, herr, D = DensityGERG_numba(P, T, x, iFlag=0)
+    return D
+
+
+@njit(types.Tuple((float64[:], float64[:, :]))(float64, float64, float64[:]))
+def common_properties_numba(T, D, x):
+    a0 = Alpha0GERG_numba(T, D, x)
+    ar = AlpharGERG_numba(T, x, itau=1, idelta=0, D=D)
+    return a0, ar
+
+
+@njit(float64(float64[:, :]))
+def compressibility_factor_numba(ar):
+    return 1 + ar[0][1]
+
+
+@njit(float64(float64, float64, float64, float64))
+def pressure_numba(D, R, T, Z):
+    return D * R * T * Z
+
+
+@njit(float64(float64, float64, float64[:, :]))
+def first_derivative_pressure_density_numba(R, T, ar):
+    return R * T * (1 + 2 * ar[0][1] + ar[0][2])
+
+
+@njit(float64(float64, float64, float64[:, :]))
+def first_derivative_pressure_temperature_numba(R, D, ar):
+    return D * R * (1 + ar[0][1] - ar[1][1])
+
+
+@njit(float64(float64, float64, float64, float64[:, :]))
+def second_derivative_pressure_temperature_density_numba(R, T, D, ar):
+    return R * T * (2 * ar[0][1] + 4 * ar[0][2] + ar[0][3]) / D
+    # return R * (1 + 2 * ar[0][1] + ar[0][2] - 2 * ar[1][1] - ar[1][2])
+
+
+@njit(float64(float64, float64, float64[:], float64[:, :]))
+def internal_energy_numba(R, T, a0, ar):
+    return R * T * (a0[1] + ar[1][0])
+
+
+@njit(float64(float64, float64, float64[:], float64[:, :]))
+def enthalpy_numba(R, T, a0, ar):
+    return R * T * (1 + ar[0][1] + a0[1] + ar[1][0])
+
+
+@njit(float64(float64, float64[:], float64[:, :]))
+def entropy_numba(R, a0, ar):
+    return R * (a0[1] + ar[1][0] - a0[0] - ar[0][0])
+
+
+@njit(float64(float64, float64[:], float64[:, :]))
+def isochoric_heat_capacity_numba(R, a0, ar):
+    return -R * (a0[2] + ar[2][0])
+
+
+@njit(float64(float64, float64, float64, float64[:], float64[:, :]))
+def isobaric_heat_capacity_numba(T, D, R, a0, ar):
+    Cv = -R * (a0[2] + ar[2][0])
+    dPdT = D * R * (1 + ar[0][1] - ar[1][1])
+    dPdD = R * T * (1 + 2 * ar[0][1] + ar[0][2])
+    if D > epsilon:
+        return Cv + T * (dPdT / D) * (dPdT / D) / dPdD
+    else:
+        return Cv + R
+
+
+@njit(float64(float64, float64, float64, float64[:], float64[:, :], float64[:]))
+def speed_of_sound_numba(T, D, R, a0, ar, x):
+    Cp = isobaric_heat_capacity_numba(T, D, R, a0, ar)
+    Cv = isochoric_heat_capacity_numba(R, a0, ar)
+    dPdD = first_derivative_pressure_density_numba(R, T, ar)
+    molar_mass = molar_mass_numba(x)
+    W = 1000 * Cp / Cv * dPdD / molar_mass
+    if W < 0:
+        W = 0
+    return math.sqrt(W)
+
+
+@njit(float64(float64, float64, float64[:], float64[:, :]))
+def gibbs_energy_numba(R, T, a0, ar):
+    return R * T * (1 + ar[0][1] + a0[0] + ar[0][0])
+
+
+@njit(float64(float64, float64, float64, float64, float64[:], float64[:, :]))
+def joule_thomson_coefficient_numba(T, D, epsilon, R, a0, ar):
+    Cp = isobaric_heat_capacity_numba(T, D, R, a0, ar)
+    dPdT = first_derivative_pressure_temperature_numba(R, D, ar)
+    dPdD = first_derivative_pressure_density_numba(R, T, ar)
+    if D > epsilon:
+        return (T / D * dPdT / dPdD - 1) / Cp / D / 1e3
+    else:
+        return 1e20
+
+
+@njit(float64(float64, float64, float64, float64[:], float64[:, :], float64[:]))
+def isentropic_exponent_numba(T, D, R, a0, ar, x):
+    W = speed_of_sound_numba(T, D, R, a0, ar, x)
+    molar_mass = molar_mass_numba(x)
+    Z = compressibility_factor_numba(ar)
+    return W**2 * molar_mass / (R * T * 1000 * Z)
+
+
+@njit(float64(float64, float64, float64[:]))
+def molar_volume_numba(T, P, x):
+    D = density_numba(P, T, x)
+    molar_mass = molar_mass_numba(x)
+    a0, ar = common_properties_numba(T, D, x)
+    Z = compressibility_factor_numba(ar)
+    R = RGERG
+    return molar_mass * P / (Z * R * T)
+
+
+@njit(float64(float64[:]))
+def molar_mass_ratio_numba(x):
+    molar_mass = molar_mass_numba(x)
+    return molar_mass / air_molar_mass
+
+
+@njit(float64(float64[:]))
+def specific_gas_constant_numba(x):
+    R = RGERG
+    molar_mass = molar_mass_numba(x)
+    return R / molar_mass

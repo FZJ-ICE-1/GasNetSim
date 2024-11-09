@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 8/21/24, 11:12 AM
+#     Last change on 11/10/24, 12:31 AM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -19,6 +19,7 @@
 # PropertiesGERG, PseudoCriticalPointGERG, and AlpharGERG.
 
 from numpy.testing import assert_almost_equal, assert_allclose
+
 # Each test is designed to assert the correctness and consistency of calculations involved in determining properties
 # like heating value, molar mass, pressure, density, ideal gas Helmholtz energy, reducing parameters,
 # pseudo-critical point, and residual Helmholtz energy.
@@ -801,3 +802,77 @@ def test_PropertiesGERG():
     calculated_PropertiesGERG = PropertiesGERG_numba(gas_mixture.T, gas_mixture.P, b)
 
     assert_allclose(expected_PropertiesGERG, calculated_PropertiesGERG)
+
+
+def test_separate_properties_GERG2008():
+    """
+    Test function to verify that the outputs of the refactored functions match those of the original PropertiesGERG2008 function.
+    """
+    T = 300.0  # Temperature in K
+    P = 101.325  # Pressure in kPa
+    x = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
+    # Original PropertiesGERG2008 function call (assuming it returns the expected outputs)
+    original_results = PropertiesGERG_numba(T, P, x)
+
+    # Calculate density and common properties to reuse in subsequent calculations
+    D = density_numba(P, T, x)
+    a0, ar = common_properties_numba(T, D, x)
+
+    # Calculate properties using the refactored functions
+    Z = compressibility_factor_numba(ar)
+    refactored_results = (
+        molar_mass_numba(x),
+        D,
+        Z,
+        first_derivative_pressure_density_numba(RGERG, T, ar),
+        second_derivative_pressure_temperature_density_numba(RGERG, T, D, ar),
+        first_derivative_pressure_temperature_numba(RGERG, D, ar),
+        internal_energy_numba(RGERG, T, a0, ar),
+        enthalpy_numba(RGERG, T, a0, ar),
+        entropy_numba(RGERG, a0, ar),
+        isochoric_heat_capacity_numba(RGERG, a0, ar),
+        isobaric_heat_capacity_numba(T, D, RGERG, a0, ar),
+        isochoric_heat_capacity_numba(RGERG, a0, ar) * 1000 / molar_mass_numba(x),
+        isobaric_heat_capacity_numba(T, D, RGERG, a0, ar) * 1000 / molar_mass_numba(x),
+        speed_of_sound_numba(T, D, RGERG, a0, ar, x),
+        gibbs_energy_numba(RGERG, T, a0, ar),
+        joule_thomson_coefficient_numba(T, D, epsilon, RGERG, a0, ar),
+        isentropic_exponent_numba(T, D, RGERG, a0, ar, x),
+        molar_volume_numba(T, P, x),
+        molar_mass_ratio_numba(x),
+        specific_gas_constant_numba(x),
+    )
+
+    # Compare each value of the refactored results to the original results
+    for i, (refactored, original) in enumerate(
+        zip(refactored_results, original_results)
+    ):
+        assert np.isclose(
+            refactored, original, rtol=1e-5, atol=1e-8
+        ), f"Mismatch in property {i}: {refactored} != {original}"
+
+    print("All properties match with the original PropertiesGERG2008 function.")
