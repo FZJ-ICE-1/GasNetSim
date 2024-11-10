@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 11/11/24, 12:55 AM
+#     Last change on 11/11/24, 12:56 AM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -97,17 +97,6 @@
 # """
 from collections import OrderedDict
 from scipy.constants import zero_Celsius
-
-
-#   #!/usr/bin/env python
-#   -*- coding: utf-8 -*-
-#   ******************************************************************************
-#     Copyright (c) 2022.
-#     Developed by Yifei Lu
-#     Last change on 4/3/22, 1:38 PM
-#     Last change by yifei
-#    *****************************************************************************
-
 import numpy as np
 import math
 from collections import Counter
