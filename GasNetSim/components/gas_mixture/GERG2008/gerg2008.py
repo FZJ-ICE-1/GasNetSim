@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 9/25/24, 10:41 PM
+#     Last change on 11/11/24, 12:55 AM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -96,6 +96,8 @@
 # static void tTermsGERG(const double lntau, const std::vector<double> &x);
 # """
 from collections import OrderedDict
+from scipy.constants import zero_Celsius
+
 
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
@@ -264,15 +266,24 @@ The compositions in the x() array use the following order and must be sent as mo
 
 class GasMixtureGERG2008:
     def __init__(
-        self, P_Pa: float, T_K: float, composition: np.array, use_numba: bool = True
+        self,
+        P_Pa: float,
+        T_K: float,
+        composition: np.array,
+        use_numba: bool = True,
+        T_ref_dens_degreeC: float = 0.0,
+        T_ref_comb_degreeC: float = 25.0 + zero_Celsius,
     ):
         # Input parameters
         self.dPdT = None
         self.d2PdD2 = None
         self.dPdD = None
-        self.P = P_Pa / 1000  # Pa -> kPa
+        self.P = P_Pa / 1000.0  # Pa -> kPa
 
         self.T = T_K
+
+        self.reference_temperature_properties = T_ref_dens_degreeC + zero_Celsius
+        self.reference_temperature_combustion = T_ref_comb_degreeC + zero_Celsius
 
         if use_numba:
             # from .gerg2008_numba import ConvertCompositionGERG_numba
@@ -315,7 +326,12 @@ class GasMixtureGERG2008:
             self.MolarDensity = properties[1]
             self.rho = properties[17]  # kg/m3
             self.standard_density = (
-                self.rho * self.T / self.P / 1e3 * atm / 288.15
+                self.rho
+                * self.T
+                / self.P
+                / 1e3
+                * atm
+                / self.reference_temperature_properties
             )  # TODO: define global constants
             self.SG = properties[18]
             self.Z = properties[2]
@@ -346,7 +362,12 @@ class GasMixtureGERG2008:
                 parameter="volume",
             )
             self.HHV_J_per_sm3 = (
-                self.HHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
+                self.HHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.reference_temperature_combustion
+                * self.T
             )
             self.HHV_J_per_kg = CalculateHeatingValue_numba(
                 MolarMass=self.MolarMass,
@@ -363,7 +384,12 @@ class GasMixtureGERG2008:
                 parameter="volume",
             )
             self.LHV_J_per_sm3 = (
-                self.LHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
+                self.LHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.reference_temperature_combustion
+                * self.T
             )
             self.LHV_J_per_kg = CalculateHeatingValue_numba(
                 MolarMass=self.MolarMass,
@@ -376,14 +402,24 @@ class GasMixtureGERG2008:
         else:
             self.PropertiesGERG()
             self.standard_density = (
-                self.rho * self.T / self.P / 1e3 * atm / 288.15
+                self.rho
+                * self.T
+                / self.P
+                / 1e3
+                * atm
+                / self.reference_temperature_properties
             )  # TODO: define global constants
 
             self.HHV_J_per_m3 = self.CalculateHeatingValue(
                 comp=composition, hhv=True, parameter="volume"
             )
             self.HHV_J_per_sm3 = (
-                self.HHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
+                self.HHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.reference_temperature_combustion
+                * self.T
             )
             self.HHV_J_per_kg = self.CalculateHeatingValue(
                 comp=composition, hhv=True, parameter="mass"
@@ -392,7 +428,12 @@ class GasMixtureGERG2008:
                 comp=composition, hhv=False, parameter="volume"
             )
             self.LHV_J_per_sm3 = (
-                self.LHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
+                self.LHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.reference_temperature_combustion
+                * self.T
             )
             self.LHV_J_per_kg = self.CalculateHeatingValue(
                 comp=composition, hhv=False, parameter="mass"
