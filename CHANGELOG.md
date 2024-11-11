@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed the packaging tool from `setuptools` to `poetry`
 - Renamed create_network_from_csv() to create_network_from_folder() for clarity and add FutureWarning
+- Changed reference temperature for GasMixture class (wrt. density and combustion properties)
 
 ## v0.1.0
 
