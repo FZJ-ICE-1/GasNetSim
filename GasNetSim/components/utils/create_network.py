@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 10/22/24, 4:35 PM
+#     Last change on 11/11/24, 9:31 PM
 #     Last change by yifei
 #    *****************************************************************************
 from collections import OrderedDict
@@ -15,10 +15,11 @@ import warnings
 from ..network import Network
 from ..node import Node
 from ..pipeline import Pipeline, Resistance, ShortPipe, LinearResistance
+from ..gas_mixture.typical_mixture_composition import NATURAL_GAS_gri30
 from ...utils.exception import *
 
 
-def read_nodes(path_to_file: Path) -> dict[int, Node]:
+def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
     """
     Read nodes from a CSV file and create Node objects.
 
@@ -32,6 +33,8 @@ def read_nodes(path_to_file: Path) -> dict[int, Node]:
     for _, row in df_node.iterrows():
         if row["gas_composition"] is not None:
             row["gas_composition"] = OrderedDict(eval(row["gas_composition"]))
+        else:
+            row["gas_composition"] = base_composition
 
         nodes[row["node_index"]] = Node(
             node_index=row["node_index"],
@@ -146,7 +149,9 @@ def read_shortpipes(path_to_file: Path, network_nodes: dict) -> dict:
 import warnings
 
 
-def create_network_from_csv(path_to_folder: Path, conversion_factor=1.0) -> Network:
+def create_network_from_csv(
+    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
 
@@ -160,10 +165,14 @@ def create_network_from_csv(path_to_folder: Path, conversion_factor=1.0) -> Netw
         FutureWarning,
         stacklevel=2,
     )
-    return create_network_from_folder(path_to_folder, conversion_factor)
+    return create_network_from_folder(
+        path_to_folder, conversion_factor, base_composition
+    )
 
 
-def create_network_from_folder(path_to_folder: Path, conversion_factor=1.0) -> Network:
+def create_network_from_folder(
+    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
 
@@ -177,7 +186,7 @@ def create_network_from_folder(path_to_folder: Path, conversion_factor=1.0) -> N
     if nodes_file is None:
         raise FileNotFoundError("Nodes file is required to create the network.")
 
-    nodes = read_nodes(nodes_file)
+    nodes = read_nodes(nodes_file, base_composition=base_composition)
 
     # Initialize network components
     network_components = {

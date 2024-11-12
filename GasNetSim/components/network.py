@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 10/17/24, 5:24 PM
+#     Last change on 11/11/24, 9:33 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -52,6 +52,7 @@ class Network:
         shortpipes=None,
         run_initialization=True,
         pressure_prev=None,
+        base_composition=None,
     ):
         """
 
@@ -71,6 +72,11 @@ class Network:
         self.junction_nodes = self.find_junction_nodes()
         self.run_initialization = run_initialization
         self.pressure_prev = pressure_prev
+
+        if base_composition is not None:
+            self.base_composition = base_composition
+        else:
+            self.base_composition = NATURAL_GAS_gri30
         # self.incidence_matrix = self.create_incidence_matrix()
 
     def all_edge_components(self):
@@ -560,7 +566,8 @@ class Network:
             self.nodes[i + 1].volumetric_flow = flow[i]
             self.nodes[i + 1].gas_mixture.pressure = self.nodes[i + 1].pressure
             self.nodes[i + 1].gas_mixture.temperature = self.nodes[i + 1].temperature
-            self.nodes[i + 1].update_gas_mixture()
+            self.nodes[i + 1].gas_mixture.update_gas_mixture()
+            # self.nodes[i + 1].update_gas_mixture()
 
             if self.nodes[i + 1].flow_type == "volumetric":
                 self.nodes[i + 1].convert_volumetric_to_energy_flow()
