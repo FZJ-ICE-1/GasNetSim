@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 11/11/24, 9:31 PM
+#     Last change on 11/17/24, 11:52 PM
 #     Last change by yifei
 #    *****************************************************************************
 from collections import OrderedDict
@@ -15,8 +15,29 @@ import warnings
 from ..network import Network
 from ..node import Node
 from ..pipeline import Pipeline, Resistance, ShortPipe, LinearResistance
-from ..gas_mixture.typical_mixture_composition import NATURAL_GAS_gri30
+from ..gas_mixture.typical_mixture_composition import COMMON_GAS_COMPOSITIONS
 from ...utils.exception import *
+
+AVAILABLE_GAS_NAMES = ", ".join(COMMON_GAS_COMPOSITIONS.keys())
+
+def get_builtin_gas_composition(name):
+    if name not in COMMON_GAS_COMPOSITIONS:
+        raise ValueError(
+            f"The gas mixture '{name}' is not implemented.\n"
+            f"Available gas mixtures: {AVAILABLE_GAS_NAMES}\n"
+            f"If you want to use a specific gas mixture composition, please assign it as a OrderedDict or implement it separately."
+        )
+    return COMMON_GAS_COMPOSITIONS[name]
+
+
+def convert_gas_composition(gas_composition: str) -> OrderedDict:
+    try:
+        return OrderedDict(eval(gas_composition))
+    except (SyntaxError, ValueError):
+        raise ValueError(
+            f"Invalid gas composition provided: {gas_composition}."
+            f"Please provide a valid built-in name or a correctly formatted dictionary string."
+        )
 
 
 def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
@@ -30,9 +51,19 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
     df_node = pd.read_csv(path_to_file, delimiter=";")
     df_node = df_node.replace({np.nan: None})
 
+    if base_composition is None:
+        base_composition = COMMON_GAS_COMPOSITIONS["NATURAL_GAS_gri30"]
+
     for _, row in df_node.iterrows():
         if row["gas_composition"] is not None:
-            row["gas_composition"] = OrderedDict(eval(row["gas_composition"]))
+            gas_composition_str = row["gas_composition"]
+
+            if "{" not in gas_composition_str and "}" not in gas_composition_str:
+                # Assume it's a built-in gas composition name
+                row["gas_composition"] = get_builtin_gas_composition(gas_composition_str)
+            else:
+                # Assume it's a string representation of a dictionary of gas composition
+                row["gas_composition"] = convert_gas_composition(row["gas_composition"])
         else:
             row["gas_composition"] = base_composition
 
