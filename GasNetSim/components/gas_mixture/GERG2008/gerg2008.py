@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 11/11/24, 12:56 AM
+#     Last change on 11/23/24, 3:43 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -261,7 +261,7 @@ class GasMixtureGERG2008:
         composition: np.array,
         use_numba: bool = True,
         T_ref_dens_degreeC: float = 0.0,
-        T_ref_comb_degreeC: float = 25.0 + zero_Celsius,
+        T_ref_comb_degreeC: float = 25.0,
     ):
         # Input parameters
         self.dPdT = None
