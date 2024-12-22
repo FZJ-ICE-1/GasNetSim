@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 11/10/24, 12:31 AM
+#     Last change on 12/22/24, 9:41 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -118,6 +118,7 @@ def test_heating_value():
         comp=gerg2008_composition,
         hhv=True,
         parameter="volume",
+        reference_temp=25
     )
 
     # assert_almost_equal(calculated_heating_value, expected_heating_value, decimal=5)

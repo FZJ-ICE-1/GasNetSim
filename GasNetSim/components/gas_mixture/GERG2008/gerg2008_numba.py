@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 11/10/24, 12:39 AM
+#     Last change on 12/22/24, 9:48 PM
 #     Last change by yifei
 #    *****************************************************************************
 import math
@@ -171,8 +171,8 @@ def ReducingParametersGERG_numba_sub(x):
 #     return np.array(gerg_composition)
 
 
-@njit(float64(float64, float64, float64[:], boolean, types.unicode_type))
-def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv, parameter):
+@njit(float64(float64, float64, float64[:], boolean, types.unicode_type, int32))
+def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv, parameter, reference_temp):
     """
     Calculate the heating value of a gas mixture based on its composition and other properties.
 
@@ -182,6 +182,7 @@ def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv, parameter):
         comp (np.array): A dictionary representing the composition of the gas mixture.
         hhv (bool): True for Higher Heating Value (HHV) calculation, False for Lower Heating Value (LHV) calculation.
         parameter (str): Specifies the parameter for heating value calculation. Options: 'mass' or 'volume'.
+        reference_temp (float64): The reference temperature for the heating value calculation. Default is 25 degree Celsius.
 
     return:
         heating_value (float64): The calculated heating value based on the provided parameters.
@@ -264,13 +265,18 @@ def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv, parameter):
         products_dict * np.take(enthalpy_mole, [2, 21, 17])
     ).sum()
 
-    # 298 K
-    hw_liq = -285825.0
-    hw_gas = -241820.0
+    # enthalpy of formation of water at different temperatures, data obtained using cantera
+    supported_temps = [25.0, 15.0]
+    enthalpy_values = {
+        25.0: (-285839.09854950657, -241824.62162536496),
+        15.0: (-286593.59823661513, -242160.26451330166),
+    }
 
-    # 273 K
-    # hw_liq = -287654.96084928664
-    # hw_gas = -242628.01574091613
+    if reference_temp in supported_temps:
+        hw_liq, hw_gas = enthalpy_values[reference_temp]
+    else:
+        raise ValueError(
+            f"Unsupported reference temperature: {reference_temp} degree Celsius. Use one of {supported_temps}.")
 
     HHV = LHV + (hw_gas - hw_liq) * products_dict[2]
 
