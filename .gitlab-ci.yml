@@ -5,7 +5,7 @@
 
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/python/tags/
-image: python:3.9.17
+image: python:$PYTHON_VERSION  # Change image dynamically depending on Python version.
 
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
@@ -22,32 +22,79 @@ cache:
     - .cache/pip
     - venv/
 
-before_script:
-  - python --version  # For debugging
-  - pip install virtualenv
-  - virtualenv venv
-  - source venv/bin/activate
+stages:
+  - pre-commit
+  - test
+  - deploy
 
-
-run:
+# Pre-commit job
+precommit:
+  stage: pre-commit
+  image: python:3.12
+  before_script:
+    - python -m pip install --upgrade pip
+    - pip install virtualenv
+    # Create and activate virtual environment
+    - virtualenv venv
+    - source venv/bin/activate
+    - pip install pre-commit poetry  # Install pre-commit and Poetry
   script:
-  - pip install -e .
-  - pip install -r ./requirements.txt
-    # run the command here
-  - pytest -v
-  artifacts:
-    paths:
-      - dist/*.whl
+    - pre-commit run poetry-export --all-files  # Run only the poetry-export hook
 
-# pages:
-#   script:
-#     - pip install sphinx sphinx-rtd-theme
-#     - cd doc
-#     - make html
-#     - mv build/html/ ../public/
-#   artifacts:
-#     paths:
-#       - public
-#   rules:
-#     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+# Define a template for testing with different Python versions
+.test_template: &test_template
+  stage: test
+  before_script:
+    - python --version
+    - python -m pip install --upgrade pip
+    - pip install virtualenv
+
+    # Create and activate the virtual environment
+    - virtualenv venv
+    - source venv/bin/activate
+    - pip install poetry
+    - poetry install
+  script:
+    - pytest -v --junitxml=reports/test-results/results.xml
+#  artifacts:
+#    paths:
+#      - reports/test-results/
+
+test:python39:
+  <<: *test_template
+  variables:
+    PYTHON_VERSION: "3.9"
+
+test:python310:
+  <<: *test_template
+  variables:
+    PYTHON_VERSION: "3.10"
+
+test:python311:
+  <<: *test_template
+  variables:
+    PYTHON_VERSION: "3.11"
+
+test:python312:
+  <<: *test_template
+  variables:
+    PYTHON_VERSION: "3.12"
+
+#test:python313:
+#  <<: *test_template
+#  variables:
+#    PYTHON_VERSION: "3.13"
+
+
+#pages:
+#  script:
+#    - pip install sphinx sphinx-rtd-theme
+#    - cd doc
+#    - make html
+#    - mv build/html/ ../public/
+#  artifacts:
+#    paths:
+#      - public
+#  rules:
+#    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

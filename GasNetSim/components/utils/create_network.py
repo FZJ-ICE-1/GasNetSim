@@ -1,47 +1,91 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2023.
+#     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 5/31/23, 4:14 PM
+#     Last change on 11/17/24, 11:52 PM
 #     Last change by yifei
 #    *****************************************************************************
-import pandas as pd
-import numpy as np
 from collections import OrderedDict
 from pathlib import Path
+import numpy as np
+import pandas as pd
+import warnings
 
-from GasNetSim.components.pipeline import Pipeline, Resistance, ShortPipe, LinearResistance
-from GasNetSim.components.node import Node
-from GasNetSim.components.network import Network
-from GasNetSim.utils.exception import *
+from ..network import Network
+from ..node import Node
+from ..pipeline import Pipeline, Resistance, ShortPipe, LinearResistance
+from ..gas_mixture.typical_mixture_composition import COMMON_GAS_COMPOSITIONS
+from ...utils.exception import *
+
+AVAILABLE_GAS_NAMES = ", ".join(COMMON_GAS_COMPOSITIONS.keys())
+
+def get_builtin_gas_composition(name):
+    if name not in COMMON_GAS_COMPOSITIONS:
+        raise ValueError(
+            f"The gas mixture '{name}' is not implemented.\n"
+            f"Available gas mixtures: {AVAILABLE_GAS_NAMES}\n"
+            f"If you want to use a specific gas mixture composition, please assign it as a OrderedDict or implement it separately."
+        )
+    return COMMON_GAS_COMPOSITIONS[name]
 
 
-def read_nodes(path_to_file: Path) -> dict:
+def convert_gas_composition(gas_composition: str) -> OrderedDict:
+    try:
+        return OrderedDict(eval(gas_composition))
+    except (SyntaxError, ValueError):
+        raise ValueError(
+            f"Invalid gas composition provided: {gas_composition}."
+            f"Please provide a valid built-in name or a correctly formatted dictionary string."
+        )
+
+
+def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
     """
+    Read nodes from a CSV file and create Node objects.
 
-    :param path_to_file:
-    :return:
+    :param path_to_file: Path to the CSV file containing nodes information.
+    :return: A dictionary of node indices to Node objects.
     """
-    nodes = dict()
-    df_node = pd.read_csv(path_to_file, delimiter=';')
+    nodes = {}
+    df_node = pd.read_csv(path_to_file, delimiter=";")
     df_node = df_node.replace({np.nan: None})
 
-    for row_index, row in df_node.iterrows():
-        if row['gas_composition'] is not None:
-            row['gas_composition'] = OrderedDict(eval(row['gas_composition']))
-        nodes[row['node_index']] = Node(node_index=row['node_index'],
-                                        pressure_pa=row['pressure_pa'],
-                                        volumetric_flow=row['flow_sm3_per_s'],
-                                        energy_flow=row['flow_MW'],
-                                        temperature=row['temperature_k'],
-                                        altitude=row['altitude_m'],
-                                        gas_composition=row['gas_composition'],
-                                        node_type=row['node_type'])
+    if base_composition is None:
+        base_composition = COMMON_GAS_COMPOSITIONS["NATURAL_GAS_gri30"]
+
+    for _, row in df_node.iterrows():
+        if row["gas_composition"] is not None:
+            gas_composition_str = row["gas_composition"]
+
+            if "{" not in gas_composition_str and "}" not in gas_composition_str:
+                # Assume it's a built-in gas composition name
+                row["gas_composition"] = get_builtin_gas_composition(gas_composition_str)
+            else:
+                # Assume it's a string representation of a dictionary of gas composition
+                row["gas_composition"] = convert_gas_composition(row["gas_composition"])
+        else:
+            row["gas_composition"] = base_composition
+
+        nodes[row["node_index"]] = Node(
+            node_index=row["node_index"],
+            pressure_pa=row["pressure_pa"],
+            volumetric_flow=row["flow_sm3_per_s"],
+            energy_flow=row["flow_MW"],
+            temperature=row["temperature_k"],
+            altitude=row["altitude_m"],
+            gas_composition=row["gas_composition"],
+            node_type=row["node_type"],
+            flow_type=row["flow_type"],
+            longitude=row.get("longitude"),
+            latitude=row.get("latitude"),
+        )
     return nodes
 
 
-def read_pipelines(path_to_file: Path, network_nodes: dict) -> dict:
+def read_pipelines(
+    path_to_file: Path, network_nodes: dict, conversion_factor=1.0
+) -> dict:
     """
 
     :param path_to_file:
@@ -49,14 +93,18 @@ def read_pipelines(path_to_file: Path, network_nodes: dict) -> dict:
     :return:
     """
     pipelines = dict()
-    df_pipe = pd.read_csv(path_to_file, delimiter=';')
+    df_pipe = pd.read_csv(path_to_file, delimiter=";")
     df_pipe = df_pipe.replace({np.nan: None})
 
     for row_index, row in df_pipe.iterrows():
-        pipelines[row['pipeline_index']] = Pipeline(inlet=network_nodes[row['inlet_index']],
-                                                    outlet=network_nodes[row['outlet_index']],
-                                                    diameter=row['diameter_m'],
-                                                    length=row['length_m'])
+        pipelines[row["pipeline_index"]] = Pipeline(
+            inlet=network_nodes[row["inlet_index"]],
+            outlet=network_nodes[row["outlet_index"]],
+            diameter=row["diameter_m"],
+            length=row["length_m"],
+            friction_factor_method=row["friction_method"],
+            conversion_factor=conversion_factor,
+        )
     return pipelines
 
 
@@ -78,13 +126,15 @@ def read_resistances(path_to_file: Path, network_nodes: dict) -> dict:
     :return:
     """
     resistances = dict()
-    df_resistance = pd.read_csv(path_to_file, delimiter=';')
+    df_resistance = pd.read_csv(path_to_file, delimiter=";")
     df_resistance = df_resistance.replace({np.nan: None})
 
     for row_index, row in df_resistance.iterrows():
-        resistances[row['resistance_index']] = Resistance(inlet=network_nodes[row['inlet_index']],
-                                                          outlet=network_nodes[row['outlet_index']],
-                                                          resistance=row['resistance'])
+        resistances[row["resistance_index"]] = Resistance(
+            inlet=network_nodes[row["inlet_index"]],
+            outlet=network_nodes[row["outlet_index"]],
+            resistance=row["resistance"],
+        )
     return resistances
 
 
@@ -96,13 +146,15 @@ def read_linear_resistances(path_to_file: Path, network_nodes: dict) -> dict:
     :return:
     """
     resistances = dict()
-    df_linear_resistance = pd.read_csv(path_to_file, delimiter=';')
+    df_linear_resistance = pd.read_csv(path_to_file, delimiter=";")
     df_linear_resistance = df_linear_resistance.replace({np.nan: None})
 
     for row_index, row in df_linear_resistance.iterrows():
-        resistances[row['linear_resistance_index']] = LinearResistance(inlet=network_nodes[row['inlet_index']],
-                                                                       outlet=network_nodes[row['outlet_index']],
-                                                                       resistance=row['linear_resistance'])
+        resistances[row["linear_resistance_index"]] = LinearResistance(
+            inlet=network_nodes[row["inlet_index"]],
+            outlet=network_nodes[row["outlet_index"]],
+            resistance=row["linear_resistance"],
+        )
     return resistances
 
 
@@ -114,56 +166,157 @@ def read_shortpipes(path_to_file: Path, network_nodes: dict) -> dict:
     :return:
     """
     shortpipes = dict()
-    df_shortpipes = pd.read_csv(path_to_file, delimiter=';')
+    df_shortpipes = pd.read_csv(path_to_file, delimiter=";")
     df_shortpipes = df_shortpipes.replace({np.nan: None})
 
     for row_index, row in df_shortpipes.iterrows():
-        shortpipes[row['shortpipe_index']] = ShortPipe(inlet=network_nodes[row['inlet_index']],
-                                                       outlet=network_nodes[row['outlet_index']])
+        shortpipes[row["shortpipe_index"]] = ShortPipe(
+            inlet=network_nodes[row["inlet_index"]],
+            outlet=network_nodes[row["outlet_index"]],
+        )
     return shortpipes
 
 
-def create_network_from_csv(path_to_folder: Path) -> Network:
+import warnings
+
+
+def create_network_from_csv(
+    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+) -> Network:
     """
+    Create a Network object from CSV files located in the specified folder.
 
-    :param path_to_folder:
-    :return:
+    :param path_to_folder: Path to the folder containing the CSV files.
+    :param conversion_factor: Conversion factor for pipeline data.
+    :return: A Network object.
     """
-    all_files = list(path_to_folder.glob('*.csv'))
-    nodes = read_nodes(Path('./' + '_'.join(all_files[0].stem.split('_')[:-1]) + '_nodes.csv'))
+    warnings.warn(
+        "create_network_from_csv() is deprecated and will be removed in a future version. "
+        "Please use create_network_from_folder() instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return create_network_from_folder(
+        path_to_folder, conversion_factor, base_composition
+    )
 
-    network_components = {'node': nodes,  # the dataset should have at least node
-                          'pipeline': None,
-                          'compressor': None,
-                          'resistance': None,
-                          'shortpipe': None,
-                          'linear_resistance': None}
 
+def create_network_from_folder(
+    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+) -> Network:
+    """
+    Create a Network object from CSV files located in the specified folder.
+
+    :param path_to_folder: Path to the folder containing the CSV files.
+    :param conversion_factor: Conversion factor for pipeline data.
+    :return: A Network object.
+    """
+    all_files = list(path_to_folder.glob("*.csv"))
+    nodes_file = next((file for file in all_files if "node" in file.stem), None)
+
+    if nodes_file is None:
+        raise FileNotFoundError("Nodes file is required to create the network.")
+
+    nodes = read_nodes(nodes_file, base_composition=base_composition)
+
+    # Initialize network components
+    network_components = {
+        "nodes": nodes,
+        "pipelines": None,
+        "compressors": None,
+        "resistances": None,
+        "shortpipes": None,
+        "linear_resistances": None,
+    }
+
+    # Mapping of component names to their corresponding read functions
+    read_functions = {
+        "pipeline": read_pipelines,
+        "compressor": read_compressors,
+        "resistance": read_resistances,
+        "linearR": read_linear_resistances,
+        "shortpipe": read_shortpipes,
+    }
+
+    # Read other components if provided
     for file in all_files:
         file_name = file.stem
-        if 'node' in file_name:
-            pass
-        elif 'pipeline' in file_name:
-            pipelines = read_pipelines(file, nodes)
-            network_components['pipeline'] = pipelines
-        elif 'compressor' in file_name:
-            compressors = read_compressors(file)
-            network_components['compressor'] = compressors
-        elif 'resistance' in file_name:
-            resistances = read_resistances(file, nodes)
-            network_components['resistance'] = resistances
-        elif 'linearR' in file_name:
-            linear_resistances = read_linear_resistances(file, nodes)
-            network_components['linear_resistance'] = linear_resistances
-        elif 'shortpipe' in file_name:
-            shortpipes = read_shortpipes(file, nodes)
-            network_components['shortpipe'] = shortpipes
-        else:
-            raise FileNameError(f'Please check the file name {file_name}.csv')
+        for component_key, read_function in read_functions.items():
+            if component_key in file_name:
+                if component_key == "pipeline":
+                    network_components[component_key + "s"] = read_function(
+                        file, nodes, conversion_factor
+                    )
+                else:
+                    network_components[component_key + "s"] = read_function(file, nodes)
+                break
 
-    return Network(nodes=network_components['node'],
-                   pipelines=network_components['pipeline'],
-                   compressors=network_components['compressor'],
-                   resistances=network_components['resistance'],
-                   linear_resistances=network_components['linear_resistance'],
-                   shortpipes=network_components['shortpipe'])
+    # Create and return the Network object
+    return Network(
+        nodes=network_components["nodes"],
+        pipelines=network_components["pipelines"],
+        compressors=network_components["compressors"],
+        resistances=network_components["resistances"],
+        linear_resistances=network_components["linear_resistances"],
+        shortpipes=network_components["shortpipes"],
+    )
+
+
+def create_network_from_files(
+    component_files: dict[str, Path], conversion_factor=1.0
+) -> Network:
+    """
+    Create a Network object from specified component CSV files.
+
+    :param component_files: A dictionary mapping component names (e.g., 'nodes', 'pipelines') to file paths.
+    :param conversion_factor: Conversion factor for pipeline data.
+    :return: A Network object.
+    """
+    # Ensure nodes file is provided
+    nodes_file = component_files.get("nodes")
+    if nodes_file is None:
+        raise ValueError("Nodes file is required to create the network.")
+
+    # Read nodes
+    nodes = read_nodes(nodes_file)
+
+    # Initialize network components
+    network_components = {
+        "nodes": nodes,
+        "pipelines": None,
+        "compressors": None,
+        "resistances": None,
+        "shortpipes": None,
+        "linear_resistances": None,
+    }
+
+    # Mapping of component names to their corresponding read functions
+    read_functions = {
+        "pipelines": read_pipelines,
+        "compressors": read_compressors,
+        "resistances": read_resistances,
+        "linear_resistances": read_linear_resistances,
+        "shortpipes": read_shortpipes,
+    }
+
+    # Read other components if provided
+    for component_name, read_function in read_functions.items():
+        if component_name in component_files:
+            if component_name == "pipelines":
+                network_components[component_name] = read_function(
+                    component_files[component_name], nodes, conversion_factor
+                )
+            else:
+                network_components[component_name] = read_function(
+                    component_files[component_name], nodes
+                )
+
+    # Create and return the Network object
+    return Network(
+        nodes=network_components["nodes"],
+        pipelines=network_components["pipelines"],
+        compressors=network_components["compressors"],
+        resistances=network_components["resistances"],
+        linear_resistances=network_components["linear_resistances"],
+        shortpipes=network_components["shortpipes"],
+    )

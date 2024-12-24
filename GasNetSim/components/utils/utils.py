@@ -1,27 +1,47 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2022.
+#     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 3/28/22, 12:44 AM
+#     Last change on 9/26/24, 10:15 AM
 #     Last change by yifei
 #    *****************************************************************************
+import copy
 import math
-from pyparsing import col
-from collections import OrderedDict
-from scipy import sparse
+
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
+from scipy import sparse
+
+from .cuda_support import create_matrix_of_zeros
+from ..pipeline import Pipeline
 
 
-def create_connection_matrix(n_nodes: int, components: dict, component_type: int, sparse_matrix: bool = False):
+# try:
+#     import cupy as cp
+#     import cupy.sparse.linalg as cpsplinalg
+# except ImportError:
+#     # logging.warning(f"CuPy is not installed or not available!")
+#     print(f"CuPy is not installed or not available!")
+
+
+def create_connection_matrix(
+    n_nodes: int,
+    components: dict,
+    component_type: int,
+    use_cuda=False,
+    sparse_matrix: bool = False,
+):
     row_ind = list()
     col_ind = list()
     data = list()
 
     if not sparse_matrix:
-        cnx = np.zeros((n_nodes, n_nodes))
+        cnx = create_matrix_of_zeros(
+            n_nodes, use_cuda=use_cuda, sparse_matrix=sparse_matrix
+        )
 
     for comp in components.values():
         i = comp.inlet_index - 1
@@ -43,11 +63,15 @@ def levenberg_marquardt_damping_factor(m, s, b):
     return 10 ** (m * math.log10(s + b))
 
 
-def delete_matrix_rows_and_columns(matrix, to_remove):
+def delete_matrix_rows_and_columns(matrix, to_remove, use_cuda=False):
     new_matrix = matrix
 
-    new_matrix = np.delete(new_matrix, to_remove, 0)  # delete rows
-    new_matrix = np.delete(new_matrix, to_remove, 1)  # delete columns
+    if use_cuda:
+        new_matrix = cp.delete(new_matrix, to_remove, 0)  # delete rows
+        new_matrix = cp.delete(new_matrix, to_remove, 1)  # delete columns
+    else:
+        new_matrix = np.delete(new_matrix, to_remove, 0)  # delete rows
+        new_matrix = np.delete(new_matrix, to_remove, 1)  # delete columns
 
     return new_matrix
 
@@ -62,48 +86,231 @@ def print_n_largest_absolute_values(n, values):
     return None
 
 
-def calculate_nodal_inflow_states(nodes, connections, mapping_connections, flow_matrix):
-    nodal_total_inflow = np.sum(np.where(flow_matrix > 0, flow_matrix, 0), axis=1)
+def gas_composition_tracking(connection, time_step, method="simple_mixing"):
+    """
+    Function to track gas composition and corresponding batch head locations inside a pipeline
+    :param connection:
+    :param time_step: Time series resolution [s]
+    :param method: Method to track gas composition
+    :return:
+    """
+    composition_history = connection.composition_history
+    batch_location_history = connection.batch_location_history
+    length = connection.length
+    velocity = connection.flow_velocity
+    outflow_composition = connection.outflow_composition
 
-    nodal_gas_inflow_composition = dict()
-    nodal_gas_inflow_temperature = dict()
+    # Record inflow gas mixture composition
+    if velocity is None:
+        velocity = 0
+    if velocity >= 0:
+        inflow_composition = connection.inlet.gas_mixture.eos_composition_tmp
+    else:
+        inflow_composition = connection.outlet.gas_mixture.eos_composition_tmp
 
-    for i_node, node in nodes.items():  # iterate over all nodes
-        inflow_from_node = np.where(flow_matrix[i_node-1] > 0)[0]  # find the supplying nodes
-        if len(inflow_from_node) == 0:
+    if method == "batch_tracking":
+        # Batch-tracking
+        batch_location_history += (
+            time_step * velocity
+        )  # Update batch head compositions and locations
+        batch_location_history = np.append(batch_location_history, 0)
+        composition_history = np.append(composition_history, inflow_composition)
+
+        # Update outflow composition
+        while (
+            abs(batch_location_history[0]) >= length
+        ):  # if the head of a batch reached the end of the pipeline
+            outflow_composition = composition_history[0]
+            composition_history, batch_location_history = (
+                composition_history[1:],
+                batch_location_history[1:],
+            )
+
+        # update connection composition and batch location history
+        connection.composition_history = composition_history
+        connection.batch_location_history = batch_location_history
+    elif method == "simple_mixing":
+        outflow_composition = copy.deepcopy(inflow_composition)
+    else:
+        print(f"Method {method} not implemented yet!")
+
+    connection.outflow_composition = outflow_composition  # Update outflow composition
+    return connection
+
+
+def create_incidence_matrix(nodes, connections):
+    branch_flow_matrix = create_branch_flow_matrix(nodes, connections)
+    incidence_matrix = math.copysign(1, branch_flow_matrix)
+
+    return incidence_matrix
+
+
+def create_branch_flow_matrix(nodes, connections, use_cuda=False):
+    n_nodes = len(nodes)
+    n_edges = len(connections)
+
+    _branch_flow_matrix = np.zeros((n_edges, n_nodes))
+    for _i, _connection in connections.items():
+        _branch_flow_matrix[_i][_connection.inlet_index - 1] = -_connection.flow_rate
+        _branch_flow_matrix[_i][_connection.outlet_index - 1] = _connection.flow_rate
+    return _branch_flow_matrix
+
+
+def create_directed_graph_using_flow_directions(pipelines: dict):
+    """
+    Creates a directed graph from pipelines using their flow directions.
+
+    :param pipelines: A dictionary of pipelines.
+
+    :return: A tuple containing:
+             - G: A NetworkX MultiDiGraph representing the pipelines with directed edges.
+             - edge_index: A dictionary mapping edge identifiers to pipeline indices.
+    """
+    G = nx.MultiDiGraph()
+    edge_index = {}
+    for i, pipeline in pipelines.items():
+        if pipeline.flow_velocity is None:
+            G.add_edge(
+                pipeline.inlet_index,
+                pipeline.outlet_index,
+                key=i,  # Use the pipeline index as the key
+                flow_rate=1.0,
+                composition=[],
+            )
+            edge_index[(pipeline.inlet_index, pipeline.outlet_index, i)] = i
+        elif pipeline.flow_velocity >= 0:
+            G.add_edge(pipeline.inlet_index, pipeline.outlet_index, key=i)
+            edge_index[(pipeline.inlet_index, pipeline.outlet_index, i)] = i
+        else:
+            G.add_edge(pipeline.outlet_index, pipeline.inlet_index, key=i)
+            edge_index[(pipeline.outlet_index, pipeline.inlet_index, i)] = i
+    return G, edge_index
+
+
+def topological_sort_of_nodes(graph: nx.MultiDiGraph):
+    """
+    Perform a topological sort of the nodes in a MultiDiGraph.
+
+    :param graph: A NetworkX MultiDiGraph representing the DAG.
+    :return: A list of nodes in topological order.
+    """
+    if not nx.is_directed_acyclic_graph(graph):
+        raise ValueError(
+            "The graph must be a Directed Acyclic Graph (DAG) to perform topological sorting."
+        )
+
+    nodes_topological_order = list(nx.topological_sort(graph))
+
+    return nodes_topological_order
+
+
+def topological_sort_of_edges(graph: nx.MultiDiGraph, edge_index: dict):
+    """
+    Perform a topological sort of the edges in a MultiDiGraph.
+
+    :param graph: A MultiDiGraph representing the network.
+    :param edge_index: A dictionary mapping (node, successor, key) to edge indices.
+    :return: A list of edge indices in topological order.
+    """
+    edge_indices_order = []
+    nodes_topological_order = topological_sort_of_nodes(graph)
+    for node in nodes_topological_order:
+        for successor in graph.successors(node):
+            # Get all edges between node and successor
+            edges = graph.get_edge_data(node, successor)
+            for key in edges:
+                edge_indices_order.append(edge_index[(node, successor, key)])
+    return edge_indices_order
+
+
+def create_nodal_composition_matrix(nodes, connections, use_cuda=False):
+    _branch_flow_matrix = create_branch_flow_matrix(nodes, connections)
+
+    _nodal_inflow_matrix = np.where(_branch_flow_matrix > 0, _branch_flow_matrix, 0)
+
+    _branch_outflow_composition = np.array(
+        [c.outflow_composition for c in connections.values()]
+    )
+    _nodal_inflow_composition = np.dot(
+        _nodal_inflow_matrix.T, _branch_outflow_composition
+    )
+
+    _nodal_inflow_vector = np.sum(
+        np.where(_branch_flow_matrix > 0, _branch_flow_matrix, 0), axis=0
+    )
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        _nodal_composition_matrix = _nodal_inflow_composition.T / _nodal_inflow_vector
+    # _nodal_composition_matrix = _nodal_inflow_composition.T / _nodal_inflow_vector
+
+    return _nodal_composition_matrix
+
+
+# @njit(boolean(float64[:, :], float64[:, :], float64, float64))
+def allclose_with_nan(a, b, rtol=1e-03, atol=1e-04):
+    # Check if arrays are close, considering NaNs
+    nan_equal = np.isnan(a) & np.isnan(b)
+    close_equal = np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=False)
+    return np.all(nan_equal | close_equal)
+
+
+def calculate_nodal_inflow_states(
+    nodes,
+    connections,
+    mapping_connections,
+    tracking_method="simple_mixing",
+    use_cuda=False,
+    time_step=0,
+):
+    to_update = True
+    _prev_nodal_composition_matrix = np.zeros((21, (len(nodes))))
+
+    # _count_nodal_inflow_iterations = 0
+
+    pipelines = {i: c for i, c in connections.items() if type(c) == Pipeline}
+    graph, edge_index = create_directed_graph_using_flow_directions(pipelines)
+    edge_orders = topological_sort_of_edges(graph, edge_index)
+
+    while to_update:
+        # _count_nodal_inflow_iterations += 1
+        for i in edge_orders:
+            pipelines[i] = gas_composition_tracking(
+                pipelines[i], time_step=time_step, method=tracking_method
+            )
+            if pipelines[i].outflow_composition is None:
+                raise ValueError("Check the topological order!")
+
+        _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
+
+        nodes = update_temporary_nodal_gas_mixture_properties(
+            nodes, _nodal_composition_matrix
+        )
+        if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
+            to_update = False
+        else:
+            _prev_nodal_composition_matrix = _nodal_composition_matrix
+
+    # print(_count_nodal_inflow_iterations)
+
+    return _nodal_composition_matrix
+
+
+def update_temporary_nodal_gas_mixture_properties(nodes, nodal_composition_matrix):
+    """
+
+    :param nodes:
+    :param nodal_composition_matrix:
+    :return:
+    """
+    for _i in range(nodal_composition_matrix.shape[1]):  # iterate over nodes
+        if np.any(np.isnan(nodal_composition_matrix[:, _i])):  # No inflow
             pass
         else:
-            inflow_from_node += 1
-
-        total_inflow_comp = dict()
-        total_inflow = nodal_total_inflow[i_node-1]
-        total_inflow_temperature_times_flow_rate = 0
-
-        for inlet_index in inflow_from_node:
-            gas_composition = nodes[inlet_index].gas_mixture.composition
-            connections[mapping_connections[i_node - 1][inlet_index - 1]].gas_mixture.composition = gas_composition
-            inflow_rate = flow_matrix[i_node-1][inlet_index-1]
-            inflow_temperature = connections[mapping_connections[i_node-1][inlet_index-1]].calc_pipe_outlet_temp()
-
-            # Sum up flow rate * temperature
-            total_inflow_temperature_times_flow_rate += inflow_rate * inflow_temperature
-
-            # create a OrderedDict to store gas flow fractions
-            gas_flow_comp = OrderedDict({gas: comp * inflow_rate for gas, comp in gas_composition.items()})
-            for gas, comp in gas_flow_comp.items():
-                if total_inflow_comp.get(gas) is None:
-                    total_inflow_comp[gas] = comp
-                else:
-                    total_inflow_comp[gas] += comp
-
-        nodal_gas_inflow_composition[i_node] = {k: v / total_inflow for k, v in total_inflow_comp.items()}
-
-        if total_inflow != .0:
-            nodal_gas_inflow_temperature[i_node] = total_inflow_temperature_times_flow_rate / total_inflow
-        else:
-            nodal_gas_inflow_temperature[i_node] = np.nan
-
-    return nodal_gas_inflow_composition, nodal_gas_inflow_temperature
+            nodes[_i + 1].gas_mixture.eos_composition_tmp = nodal_composition_matrix[
+                :, _i
+            ]
+            # nodes[_i+1].gas_mixture.update_gas_mixture()
+    return nodes
 
 
 def calculate_flow_matrix(network, pressure_bar):
@@ -121,20 +328,22 @@ def calculate_flow_matrix(network, pressure_bar):
     for connection in connections.values():
         i = connection.inlet_index - 1
         j = connection.outlet_index - 1
-        connection.inlet = nodes[i+1]
-        connection.outlet = nodes[j+1]
+        connection.inlet = nodes[i + 1]
+        connection.outlet = nodes[j + 1]
 
         flow_direction = connection.determine_flow_direction()
 
-        p1 = nodes[i+1].pressure
-        p2 = nodes[j+1].pressure
+        p1 = nodes[i + 1].pressure
+        p2 = nodes[j + 1].pressure
 
         slope_correction = connection.calc_pipe_slope_correction()
         temp = connection.calculate_coefficient_for_iteration()
 
-        flow_rate = flow_direction * abs(p1 ** 2 - p2 ** 2 - slope_correction) ** (1 / 2) * temp
+        flow_rate = (
+            flow_direction * abs(p1**2 - p2**2 - slope_correction) ** (1 / 2) * temp
+        )
 
-        flow_mat[i][j] = - flow_rate
+        flow_mat[i][j] = -flow_rate
         flow_mat[j][i] = flow_rate
 
     return flow_mat
@@ -144,7 +353,11 @@ def calculate_flow_vector(network, pressure_bar, target_flow):
     flow_matrix = calculate_flow_matrix(network, pressure_bar)
     n_nodes = len(network.nodes.values())
     nodal_flow = np.dot(flow_matrix, np.ones(n_nodes))
-    nodal_flow = [nodal_flow[i] for i in range(len(nodal_flow)) if i + 1 not in network.non_junction_nodes]
+    nodal_flow = [
+        nodal_flow[i]
+        for i in range(len(nodal_flow))
+        if i + 1 not in network.non_junction_nodes
+    ]
     delta_flow = target_flow - nodal_flow
 
     # delta_flow = [delta_flow[i] for i in range(len(delta_flow)) if i + 1 not in network.non_junction_nodes]
@@ -155,7 +368,7 @@ def plot_network_demand_distribution(network):
     nodes = network.nodes.values()
     node_demand = [n.volumetric_flow for n in nodes if n.volumetric_flow is not None]
     sns.histplot(data=node_demand, stat="probability")
-    plt.xlim((min(node_demand)-10, max(node_demand) + 10))
+    plt.xlim((min(node_demand) - 10, max(node_demand) + 10))
     plt.xlabel("Nodal volumetric flow demand [sm^3/s]")
     plt.show()
     return None
@@ -163,6 +376,7 @@ def plot_network_demand_distribution(network):
 
 def check_square_matrix(a):
     return a.shape[0] == a.shape[1]
+
 
 def check_symmetric(a, rtol=1e-05, atol=1e-08):
     return np.allclose(a, a.T, rtol=rtol, atol=atol)
@@ -180,15 +394,15 @@ def check_all_off_diagonal_elements(a, criterion):
         for j in range(a.shape[1]):
             if i != j:
                 if criterion == "zero":
-                    res = (a[i][j] == 0)
+                    res = a[i][j] == 0
                 elif criterion == "positive":
-                    res = (a[i][j] > 0)
+                    res = a[i][j] > 0
                 elif criterion == "non-negative":
-                    res = (a[i][j] >= 0)
+                    res = a[i][j] >= 0
                 elif criterion == "negative":
-                    res = (a[i][j] < 0)
+                    res = a[i][j] < 0
                 elif criterion == "non-positive":
-                    res = (a[i][j] <= 0)
+                    res = a[i][j] <= 0
                 else:
                     print("Check the given criterion!")
                     return False

@@ -6,8 +6,9 @@
 #     Last change on 8/2/22, 3:32 PM
 #     Last change by yifei
 #    *****************************************************************************
-import GasNetSim as gns
 from pathlib import Path
+
+import GasNetSim as gns
 
 network = gns.create_network_from_csv(Path('.'))
 gns.run_time_series(network, 'profiles/test_profiles.csv')
