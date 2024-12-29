@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 11/17/24, 11:52 PM
+#     Last change on 12/19/24, 10:24 AM
 #     Last change by yifei
 #    *****************************************************************************
 from collections import OrderedDict
@@ -97,12 +97,13 @@ def read_pipelines(
     df_pipe = df_pipe.replace({np.nan: None})
 
     for row_index, row in df_pipe.iterrows():
+        friction_method = row.get("friction_method", "chen") or "chen"
         pipelines[row["pipeline_index"]] = Pipeline(
             inlet=network_nodes[row["inlet_index"]],
             outlet=network_nodes[row["outlet_index"]],
             diameter=row["diameter_m"],
             length=row["length_m"],
-            friction_factor_method=row["friction_method"],
+            friction_factor_method=friction_method,
             conversion_factor=conversion_factor,
         )
     return pipelines
