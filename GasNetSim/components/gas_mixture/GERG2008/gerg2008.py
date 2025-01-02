@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2024.
+#     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 12/22/24, 9:55 PM
+#     Last change on 1/2/25, 12:15 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -143,13 +143,13 @@ def convert_gerg2008_to_dictionary(gerg2008_composition: np.array) -> OrderedDic
     assert gerg2008_composition.shape == (21,), "Check the GERG-2008 composition array"
     global gerg_gas_spices
 
-    gas_mixutre_composition = OrderedDict()
+    gas_mixture_composition = OrderedDict()
 
     for _i in range(21):
         if gerg2008_composition[_i] > 0:
-            gas_mixutre_composition[gerg_gas_spices[_i]] = gerg2008_composition[_i]
+            gas_mixture_composition[gerg_gas_spices[_i]] = gerg2008_composition[_i]
 
-    return gas_mixutre_composition
+    return gas_mixture_composition
 
 
 def gerg2008_gas_compounds_atomic_composition() -> np.array(21):
@@ -260,8 +260,8 @@ class GasMixtureGERG2008:
         T_K: float,
         composition: np.array,
         use_numba: bool = True,
-        T_ref_dens_degreeC: float = 0.,
-        T_ref_comb_degreeC: float = 25.,
+        T_ref_dens_degreeC: float = 0.0,
+        T_ref_comb_degreeC: float = 25.0,
     ):
         # Input parameters
         self.dPdT = None
@@ -317,13 +317,7 @@ class GasMixtureGERG2008:
             self.SG = properties[18]
             self.Z = properties[2]
             self.standard_density = (
-                self.rho
-                * self.T
-                / self.P
-                / 1e3
-                * atm
-                / self.ref_temp_props_K
-                * self.Z
+                self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K * self.Z
             )  # TODO: define global constants
             self.dPdD = properties[3]
             self.d2PdD2 = properties[4]
@@ -350,7 +344,7 @@ class GasMixtureGERG2008:
                 comp=composition,
                 hhv=True,
                 parameter="volume",
-                reference_temp=self.ref_temp_comb_water_C
+                reference_temp=self.ref_temp_comb_water_C,
             )
             self.HHV_J_per_sm3 = (
                 self.HHV_J_per_m3
@@ -367,7 +361,7 @@ class GasMixtureGERG2008:
                 comp=composition,
                 hhv=True,
                 parameter="mass",
-                reference_temp=self.ref_temp_comb_water_C
+                reference_temp=self.ref_temp_comb_water_C,
             )
             self.LHV_J_per_m3 = CalculateHeatingValue_numba(
                 MolarMass=self.MolarMass,
@@ -375,7 +369,7 @@ class GasMixtureGERG2008:
                 comp=composition,
                 hhv=False,
                 parameter="volume",
-                reference_temp=self.ref_temp_comb_water_C
+                reference_temp=self.ref_temp_comb_water_C,
             )
             self.LHV_J_per_sm3 = (
                 self.LHV_J_per_m3
@@ -392,18 +386,13 @@ class GasMixtureGERG2008:
                 comp=composition,
                 hhv=False,
                 parameter="mass",
-                reference_temp=self.ref_temp_comb_water_C
+                reference_temp=self.ref_temp_comb_water_C,
             )
 
         else:
             self.PropertiesGERG()
             self.standard_density = (
-                self.rho
-                * self.T
-                / self.P
-                / 1e3
-                * atm
-                / self.ref_temp_props_K
+                self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K
             )  # TODO: define global constants
 
             self.HHV_J_per_m3 = self.CalculateHeatingValue(
