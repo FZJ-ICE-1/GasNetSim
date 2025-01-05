@@ -3,14 +3,16 @@
 #   ******************************************************************************
 #     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 1/5/25, 9:14 PM
+#     Last change on 1/5/25, 11:15 PM
 #     Last change by yifei
 #    *****************************************************************************
 import pandas as pd
 from pathlib import Path
 import logging
 import copy
+import os
 from tqdm import tqdm
+from typing import Dict, List
 
 from ..components.network import Network
 from ..components.utils.utils import plot_network_demand_distribution
@@ -167,7 +169,7 @@ def update_network_topology(network):
 
 def run_time_series(
     network,
-    file=None,
+    profiles,
     sep=";",
     profile_type="energy",
     composition_tracking=False,
@@ -181,16 +183,21 @@ def run_time_series(
     # Validate results_to_save before running the simulation
     validate_results_to_save(results_to_save)
 
+    # Ensure profiles are not empty
+    if profiles.empty:
+        raise ValueError("Profiles data is empty. Please provide valid profile data.")
+
     # Initialize
     full_network = copy.deepcopy(network)
     results = dict([(k, []) for k in results_to_save])
 
-    # Read profiles
-    if file is not None:
-        profiles = read_profiles(file, sep=sep)
-        time_steps = profiles.index
-    else:
-        time_steps = range(5)  # Test with 5 fictitious time steps
+    # # Read profiles
+    # if file is not None:
+    #     profiles = read_profiles(file, sep=sep)
+    #     time_steps = profiles.index
+    # else:
+    #     time_steps = range(5)  # Test with 5 fictitious time steps
+    time_steps = profiles.index
 
     # Log errors
     error_log = []
@@ -304,70 +311,75 @@ def save_time_series_results(network, results, results_to_save):
 
 
 def save_time_series_results_to_file(
-    results, time_steps, output_format="excel", output_filename="time_series_results"
+    results: Dict[str, List],
+    time_steps: List[int],
+    output_format: str = "excel",
+    output_filename: str = "time_series_results",
 ):
     """
-    Save simulation results to a file in the specified format.
-    :param results: Dictionary containing results of simulation.
+    Save network.results to a file in the specified format.
+    :param results: Dictionary containing results of simulation (e.g., network.results).
     :param time_steps: List of time step indices.
     :param output_format: Output format, options are 'excel', 'csv', 'hdf5', or 'json'.
     :param output_filename: Base filename for output files.
     """
-    # Create DataFrames for each type of result
-    nodal_pressure_df = pd.DataFrame(
-        results["nodal_pressure"],
-        index=time_steps,
-        columns=[f"node_{i+1}" for i in range(len(results["nodal_pressure"][0]))],
-    )
-    pipeline_flowrate_df = pd.DataFrame(
-        results["pipeline_flowrate"],
-        index=time_steps,
-        columns=[
-            f"pipeline_{i+1}" for i in range(len(results["pipeline_flowrate"][0]))
-        ],
-    )
-    nodal_gas_composition_df = pd.DataFrame(
-        results["nodal_gas_composition"],
-        index=time_steps,
-        columns=[
-            f"node_{i+1}" for i in range(len(results["nodal_gas_composition"][0]))
-        ],
-    )
+    # Dynamically create DataFrames
+    dataframes = {}
+    for key, data in results.items():
+        if data:
+            label = "node" if "nodal" in key else "pipeline"
+            dataframes[key.replace("_", " ").title()] = pd.DataFrame(
+                data,
+                index=time_steps,
+                columns=[f"{label}_{i+1}" for i in range(len(data[0]))],
+            )
 
-    dataframes = {
-        "Nodal Pressure": nodal_pressure_df,
-        "Pipeline Flowrate": pipeline_flowrate_df,
-        "Nodal Gas Composition": nodal_gas_composition_df,
+    # Ensure output directory exists for formats that need it
+    if output_format.lower() in {"csv", "json"}:
+        os.makedirs(output_filename, exist_ok=True)
+
+    # Define format-specific save logic
+    save_methods = {
+        "excel": lambda: save_to_excel(dataframes, output_filename),
+        "csv": lambda: save_to_csv(dataframes, output_filename),
+        "hdf5": lambda: save_to_hdf5(dataframes, output_filename),
+        "json": lambda: save_to_json(dataframes, output_filename),
     }
 
-    # Handle output format
-    if output_format.lower() == "excel":
-        with pd.ExcelWriter(f"{output_filename}.xlsx") as writer:
-            for sheet_name, df in dataframes.items():
-                df.to_excel(writer, sheet_name=sheet_name)
-        print(f"Results saved to {output_filename}.xlsx")
-
-    elif output_format.lower() == "csv":
-        os.makedirs(output_filename, exist_ok=True)
-        for sheet_name, df in dataframes.items():
-            df.to_csv(os.path.join(output_filename, f"{sheet_name}.csv"))
-        print(f"Results saved to directory: {output_filename}")
-
-    elif output_format.lower() == "hdf5":
-        with pd.HDFStore(f"{output_filename}.h5") as store:
-            for sheet_name, df in dataframes.items():
-                store.put(sheet_name, df, format="table")
-        print(f"Results saved to {output_filename}.h5")
-
-    elif output_format.lower() == "json":
-        os.makedirs(output_filename, exist_ok=True)
-        for sheet_name, df in dataframes.items():
-            df.to_json(
-                os.path.join(output_filename, f"{sheet_name}.json"), orient="split"
+    # Save results based on output_format
+    try:
+        save_method = save_methods.get(output_format.lower())
+        if save_method:
+            save_method()
+        else:
+            raise ValueError(
+                f"Unsupported format: {output_format}. Supported formats are: 'excel', 'csv', 'hdf5', 'json'."
             )
-        print(f"Results saved to directory: {output_filename}")
+    except Exception as e:
+        raise IOError(f"Failed to save results: {str(e)}")
 
-    else:
-        raise ValueError(
-            f"Unsupported format: {output_format}. Supported formats are: 'excel', 'csv', 'hdf5', 'json'."
-        )
+
+def save_to_excel(dataframes: Dict[str, pd.DataFrame], output_filename: str):
+    with pd.ExcelWriter(f"{output_filename}.xlsx") as writer:
+        for sheet_name, df in dataframes.items():
+            df.to_excel(writer, sheet_name=sheet_name)
+    print(f"Results saved to {output_filename}.xlsx")
+
+
+def save_to_csv(dataframes: Dict[str, pd.DataFrame], output_filename: str):
+    for sheet_name, df in dataframes.items():
+        df.to_csv(os.path.join(output_filename, f"{sheet_name}.csv"))
+    print(f"Results saved to directory: {output_filename}")
+
+
+def save_to_hdf5(dataframes: Dict[str, pd.DataFrame], output_filename: str):
+    with pd.HDFStore(f"{output_filename}.h5") as store:
+        for sheet_name, df in dataframes.items():
+            store.put(sheet_name, df, format="table")
+    print(f"Results saved to {output_filename}.h5")
+
+
+def save_to_json(dataframes: Dict[str, pd.DataFrame], output_filename: str):
+    for sheet_name, df in dataframes.items():
+        df.to_json(os.path.join(output_filename, f"{sheet_name}.json"), orient="split")
+    print(f"Results saved to directory: {output_filename}")
