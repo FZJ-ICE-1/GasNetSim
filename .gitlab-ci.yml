@@ -39,7 +39,7 @@ precommit:
     - source venv/bin/activate
     - pip install pre-commit poetry  # Install pre-commit and Poetry
   script:
-    - pre-commit run poetry-export --all-files  # Run only the poetry-export hook
+    - pre-commit run --all-files  # Run only the poetry-export hook
 
 
 # Define a template for testing with different Python versions
