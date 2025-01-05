@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2024.
+#     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 12/25/24, 11:16 PM
+#     Last change on 1/5/25, 9:14 PM
 #     Last change by yifei
 #    *****************************************************************************
 import pandas as pd
@@ -33,10 +33,36 @@ VALID_RESULT_KEYS = [
 ]
 
 
-def read_profiles(file, sep=";"):
-    profiles = pd.read_csv(Path(file), sep=sep)
-    logger.info(f"Reading profiles from {file}.")
-    return profiles
+def read_profiles(file_path, sep=";"):
+    """
+    Read profiles from a CSV file and handle potential issues like index columns or non-integer column names.
+    :param file_path: Path to the CSV file.
+    :param sep: Separator used in the CSV file (default is ';').
+    :return: DataFrame with profile data.
+    """
+    try:
+        profiles = pd.read_csv(Path(file_path), sep=sep)
+
+        # Handle potential index column (e.g., "Unnamed: 0")
+        if "Unnamed: 0" in profiles.columns:
+            profiles = profiles.set_index("Unnamed: 0")
+
+        # Convert non-time column names to integers, if possible
+        profiles.columns = [
+            int(col) if col != "time" else col for col in profiles.columns
+        ]
+
+        logger.info(f"Successfully read profiles from {file_path}.")
+        return profiles
+
+    except FileNotFoundError:
+        raise FileNotFoundError(f"The file at '{file_path}' was not found.")
+    except pd.errors.EmptyDataError:
+        raise ValueError(f"The file at '{file_path}' contains no data.")
+    except pd.errors.ParserError as e:
+        raise ValueError(f"Failed to parse the CSV file at '{file_path}': {str(e)}")
+    except ValueError as e:
+        raise ValueError(f"Column name conversion failed: {str(e)}")
 
 
 def print_progress_bar(
@@ -57,11 +83,31 @@ def print_progress_bar(
 
 
 def check_profiles(profiles):
-    if profiles["time"].dtype == int:
-        print()
-    elif profiles["time"].dtype == pd.Timestamp:
-        print()
-        # df['time'] = df['time'].apply(lambda x: pd.Timestamp.now() + pd.Timedelta(seconds=x))
+    """
+    Validate and preprocess the profiles DataFrame.
+    :param profiles: DataFrame containing profile data.
+    :return: Processed profiles DataFrame.
+    """
+    if "time" in profiles.columns:
+        # Handle 'time' column if present
+        if profiles["time"].dtype == int:
+            # Convert integer-based time to datetime
+            profiles["time"] = pd.to_datetime(
+                profiles["time"], unit="s", origin=pd.Timestamp("1970-01-01")
+            )
+            logger.info("Converted integer 'time' column to datetime format.")
+        elif pd.api.types.is_datetime64_any_dtype(profiles["time"]):
+            logger.info("Time column is already in datetime format.")
+        else:
+            raise ValueError("The 'time' column must be either integer or datetime.")
+
+        # Set 'time' as the index for time-based operations
+        profiles = profiles.set_index("time")
+        logger.info("Set 'time' column as index.")
+    else:
+        logger.info("'time' column is not present. Proceeding without time index.")
+
+    return profiles
 
 
 def run_snapshot(network, tol=0.01, use_cuda=False, tracking_method="simple_mixing"):
@@ -170,10 +216,10 @@ def run_time_series(
             else:
                 try:
                     if profile_type == "volumetric":
-                        full_network.nodes[i].volumetric_flow = profiles[str(i)][t]
+                        full_network.nodes[i].volumetric_flow = profiles[i][t]
                         full_network.nodes[i].convert_volumetric_to_energy_flow()
                     elif profile_type == "energy":
-                        full_network.nodes[i].energy_flow = profiles[str(i)][t]
+                        full_network.nodes[i].energy_flow = profiles[i][t]
                         full_network.nodes[i].convert_energy_to_volumetric_flow()
                     else:
                         raise ValueError(f"Unknown profile type {profile_type}!")
