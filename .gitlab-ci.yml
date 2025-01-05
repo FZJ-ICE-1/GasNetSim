@@ -28,7 +28,7 @@ stages:
   - deploy
 
 # Pre-commit job
-precommit:
+pre-commit:
   stage: pre-commit
   image: python:3.12
   before_script:
@@ -37,9 +37,16 @@ precommit:
     # Create and activate virtual environment
     - virtualenv venv
     - source venv/bin/activate
-    - pip install pre-commit poetry  # Install pre-commit and Poetry
+    - pip install poetry==1.6.1  # Install Poetry in the CI environment
+    - export PATH="$HOME/.local/bin:$PATH"
+    - poetry --version    # Verify Poetry installation
+    - pip install pre-commit  # Install pre-commit if needed
   script:
-    - pre-commit run --all-files  # Run only the poetry-export hook
+    - pre-commit run --all-files  # Run pre-commit hooks
+  cache:
+      paths:
+        - .cache/pip
+        - .local/share/pypoetry
 
 
 # Define a template for testing with different Python versions
