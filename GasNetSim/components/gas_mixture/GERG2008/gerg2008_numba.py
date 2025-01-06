@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 1/6/25, 2:40 PM
+#     Last change on 1/6/25, 4:13 PM
 #     Last change by yifei
 #    *****************************************************************************
 import math
@@ -171,9 +171,9 @@ def ReducingParametersGERG_numba_sub(x):
 #     return np.array(gerg_composition)
 
 
-@njit(float64(float64, float64, float64[:], boolean, types.unicode_type, float64))
+@njit(float64(float64, float64, float64[:], boolean, boolean, float64))
 def CalculateHeatingValue_numba(
-    MolarMass, MolarDensity, comp, hhv, parameter, reference_temp
+    MolarMass, MolarDensity, comp, hhv, per_mass, reference_temp
 ):
     """
     Calculate the heating value of a gas mixture based on its composition and other properties.
@@ -183,7 +183,7 @@ def CalculateHeatingValue_numba(
         MolarDensity (float64): The molar density of the gas mixture.
         comp (np.array): A dictionary representing the composition of the gas mixture.
         hhv (bool): True for Higher Heating Value (HHV) calculation, False for Lower Heating Value (LHV) calculation.
-        parameter (str): Specifies the parameter for heating value calculation. Options: 'mass' or 'volume'.
+        per_mass (bool): Specifies the parameter for heating value calculation. Options: 'mass' or 'volume'.
         reference_temp (float64): The reference temperature for the heating value calculation. Default is 25 degree Celsius.
 
     return:
@@ -269,21 +269,19 @@ def CalculateHeatingValue_numba(
 
     # enthalpy of formation of water at different temperatures, data obtained using cantera
     supported_temps = [25.0, 15.0]
-    enthalpy_values = {
-        25.0: (-285839.09854950657, -241824.62162536496),
-        15.0: (-286593.59823661513, -242160.26451330166),
-    }
 
-    if reference_temp in supported_temps:
-        hw_liq, hw_gas = enthalpy_values[reference_temp]
+    if reference_temp == 25.0:
+        hw_liq, hw_gas = -285839.09854950657, -241824.62162536496
+    elif reference_temp == 15.0:
+        hw_liq, hw_gas = -286593.59823661513, -242160.26451330166
     else:
-        raise ValueError(
+        print(
             f"Unsupported reference temperature: {reference_temp} degree Celsius. Use one of {supported_temps}."
         )
 
     HHV = LHV + (hw_gas - hw_liq) * products_dict[2]
 
-    if parameter == "mass":
+    if per_mass:
         # returns heating value in J/kg
         if hhv:
             heating_value = HHV / MolarMass * 1e3

@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2024.
+#     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 12/22/24, 9:56 PM
+#     Last change on 1/6/25, 3:53 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -85,8 +85,8 @@ def test_heating_value_100iter():
             MolarDensity=molardensity,
             comp=gerg_composition,
             hhv=True,
-            parameter="volume",
-            reference_temp=25
+            per_mass=False,
+            reference_temp=25.0,
         )
 
         # assert_almost_equal(calculated_heating_value, expected_heating_value, decimal=5)

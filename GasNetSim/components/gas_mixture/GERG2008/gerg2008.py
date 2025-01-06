@@ -3,7 +3,7 @@
 #   ******************************************************************************
 #     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 1/2/25, 12:15 PM
+#     Last change on 1/6/25, 3:43 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -343,7 +343,7 @@ class GasMixtureGERG2008:
                 MolarDensity=self.MolarDensity,
                 comp=composition,
                 hhv=True,
-                parameter="volume",
+                per_mass=False,
                 reference_temp=self.ref_temp_comb_water_C,
             )
             self.HHV_J_per_sm3 = (
@@ -360,7 +360,7 @@ class GasMixtureGERG2008:
                 MolarDensity=self.MolarDensity,
                 comp=composition,
                 hhv=True,
-                parameter="mass",
+                per_mass=True,
                 reference_temp=self.ref_temp_comb_water_C,
             )
             self.LHV_J_per_m3 = CalculateHeatingValue_numba(
@@ -368,7 +368,7 @@ class GasMixtureGERG2008:
                 MolarDensity=self.MolarDensity,
                 comp=composition,
                 hhv=False,
-                parameter="volume",
+                per_mass=False,
                 reference_temp=self.ref_temp_comb_water_C,
             )
             self.LHV_J_per_sm3 = (
@@ -385,7 +385,7 @@ class GasMixtureGERG2008:
                 MolarDensity=self.MolarDensity,
                 comp=composition,
                 hhv=False,
-                parameter="mass",
+                per_mass=True,
                 reference_temp=self.ref_temp_comb_water_C,
             )
 
