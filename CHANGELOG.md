@@ -12,12 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tutorials implemented using Binder
 - Function to create network using files
 - Use `networkx` for topological sort of pipelines and nodes
+- Different reference temperature values for gas mixture heating value calculation (15 or 25 degrees Celsius)
+- Reference pressure, temperature and composition for gas mixture initialization
+- pre-commit hooks for automatically updating requirements.txt
 
 ### Changed
 
 - Changed the packaging tool from `setuptools` to `poetry`
 - Renamed create_network_from_csv() to create_network_from_folder() for clarity and add FutureWarning
 - Changed reference temperature for GasMixture class (wrt. density and combustion properties)
+- Changed run_time_series() to use profiles instead of profile file path
+- Improved results saving of time series simulations (support different output file formats)
 
 ## v0.1.0
 
