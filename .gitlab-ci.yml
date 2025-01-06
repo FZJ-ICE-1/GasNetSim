@@ -37,7 +37,8 @@ pre-commit:
     # Create and activate virtual environment
     - virtualenv venv
     - source venv/bin/activate
-    - pip install poetry==1.6.1  # Install Poetry in the CI environment
+    - pip install poetry  # Install Poetry in the CI environment
+    - pip install poetry-plugin-export
     - export PATH="$HOME/.local/bin:$PATH"
     - poetry --version    # Verify Poetry installation
     - pip install pre-commit  # Install pre-commit if needed
