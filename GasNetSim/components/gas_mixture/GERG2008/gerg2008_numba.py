@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2024.
+#     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 12/22/24, 9:48 PM
+#     Last change on 1/6/25, 2:40 PM
 #     Last change by yifei
 #    *****************************************************************************
 import math
@@ -171,8 +171,10 @@ def ReducingParametersGERG_numba_sub(x):
 #     return np.array(gerg_composition)
 
 
-@njit(float64(float64, float64, float64[:], boolean, types.unicode_type, int32))
-def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv, parameter, reference_temp):
+@njit(float64(float64, float64, float64[:], boolean, types.unicode_type, float64))
+def CalculateHeatingValue_numba(
+    MolarMass, MolarDensity, comp, hhv, parameter, reference_temp
+):
     """
     Calculate the heating value of a gas mixture based on its composition and other properties.
 
@@ -276,7 +278,8 @@ def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv, parameter, r
         hw_liq, hw_gas = enthalpy_values[reference_temp]
     else:
         raise ValueError(
-            f"Unsupported reference temperature: {reference_temp} degree Celsius. Use one of {supported_temps}.")
+            f"Unsupported reference temperature: {reference_temp} degree Celsius. Use one of {supported_temps}."
+        )
 
     HHV = LHV + (hw_gas - hw_liq) * products_dict[2]
 
