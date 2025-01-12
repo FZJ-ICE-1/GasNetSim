@@ -404,16 +404,18 @@ def calculate_nodal_inflow_states(
     # _count_nodal_inflow_iterations = 0
 
     pipelines = {i: c for i, c in connections.items() if type(c) == Pipeline}
+    pipelines_copy = copy.deepcopy(pipelines)
+
     graph, edge_index = create_directed_graph_using_flow_directions(pipelines)
     edge_orders = topological_sort_of_edges(graph, edge_index)
 
     while to_update:
         # _count_nodal_inflow_iterations += 1
         for i in edge_orders:
-            pipelines[i] = gas_composition_tracking(
-                pipelines[i], time_step=time_step, method=tracking_method
+            pipelines_copy[i] = gas_composition_tracking(
+                pipelines_copy[i], time_step=time_step, method=tracking_method
             )
-            if pipelines[i].outflow_composition is None:
+            if pipelines_copy[i].outflow_composition is None:
                 raise ValueError("Check the topological order!")
 
         _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
@@ -421,11 +423,13 @@ def calculate_nodal_inflow_states(
         nodes = update_temporary_nodal_gas_mixture_properties(
             nodes, _nodal_composition_matrix
         )
+
         if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
             to_update = False
         else:
             _prev_nodal_composition_matrix = _nodal_composition_matrix
 
+    pipelines.update(pipelines_copy)
     # print(_count_nodal_inflow_iterations)
 
     return _nodal_composition_matrix
