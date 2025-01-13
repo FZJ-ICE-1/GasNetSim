@@ -245,10 +245,14 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
     # Record inflow gas mixture composition
     if velocity is None:
         velocity = 0
+
+    inlet_composition = connection.inlet.gas_mixture.eos_composition_tmp
+    outlet_composition = connection.outlet.gas_mixture.eos_composition_tmp
+
     if velocity >= 0:
-        inflow_composition = connection.inlet.gas_mixture.eos_composition_tmp
+        inflow_composition = inlet_composition
     else:
-        inflow_composition = connection.outlet.gas_mixture.eos_composition_tmp
+        inflow_composition = outlet_composition
 
     if method == "batch_tracking":
         (
@@ -260,17 +264,22 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
             time_step,
             velocity,
             length,
-            inflow_composition,
-            outflow_composition,
+            inlet_composition,
+            outlet_composition,
             batch_location_history,
             composition_history,
         )
+        if velocity >= 0:
+            outflow_composition = connection.outlet.gas_mixture.eos_composition_tmp
+        else:
+            outflow_composition = connection.inlet.gas_mixture.eos_composition_tmp
     elif method == "simple_mixing":
         outflow_composition = copy.deepcopy(inflow_composition)
     else:
         print(f"Method {method} not implemented yet!")
 
-    connection.outflow_composition = outflow_composition  # Update outflow composition
+    connection.outflow_composition = outflow_composition
+
     return connection
 
 
@@ -403,32 +412,67 @@ def calculate_nodal_inflow_states(
 
     # _count_nodal_inflow_iterations = 0
 
-    pipelines = {i: c for i, c in connections.items() if type(c) == Pipeline}
-    pipelines_copy = copy.deepcopy(pipelines)
+    connections_copy = copy.deepcopy(connections)
+    pipelines_copy = {
+        pipeline_id: connections_copy[connection_id]
+        for pipeline_id, pipeline in pipelines.items()
+        for connection_id, connection in connections.items()
+        if connection is pipeline
+    }
 
     graph, edge_index = create_directed_graph_using_flow_directions(pipelines)
     edge_orders = topological_sort_of_edges(graph, edge_index)
 
     while to_update:
         # _count_nodal_inflow_iterations += 1
+        to_update = False  # Assume no updates initially
+
         for i in edge_orders:
+            # Store the previous inlet and outlet compositions
+            previous_inlet_composition = pipelines_copy[
+                i
+            ].inlet.gas_mixture.eos_composition_tmp.copy()
+            previous_outlet_composition = pipelines_copy[
+                i
+            ].outlet.gas_mixture.eos_composition_tmp.copy()
+
+            # Perform gas composition tracking
             pipelines_copy[i] = gas_composition_tracking(
                 pipelines_copy[i], time_step=time_step, method=tracking_method
             )
-            if pipelines_copy[i].outflow_composition is None:
-                raise ValueError("Check the topological order!")
 
-        _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
+            # Compare the current and previous compositions
+            current_inlet_composition = pipelines_copy[
+                i
+            ].inlet.gas_mixture.eos_composition_tmp
+            current_outlet_composition = pipelines_copy[
+                i
+            ].outlet.gas_mixture.eos_composition_tmp
 
+            if not np.array_equal(
+                previous_inlet_composition, current_inlet_composition
+            ) or not np.array_equal(
+                previous_outlet_composition, current_outlet_composition
+            ):
+                to_update = True  # Mark as updated if any composition changes
+
+        # Recompute nodal composition matrix
+        _nodal_composition_matrix = create_nodal_composition_matrix(
+            nodes, connections_copy
+        )
+
+        # Update nodes with the new composition matrix
         nodes = update_temporary_nodal_gas_mixture_properties(
             nodes, _nodal_composition_matrix
         )
 
+        # Check for convergence
         if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
-            to_update = False
-        else:
-            _prev_nodal_composition_matrix = _nodal_composition_matrix
+            break  # Exit the loop if converged
 
+        _prev_nodal_composition_matrix = _nodal_composition_matrix
+
+    connections.update(connections_copy)
     pipelines.update(pipelines_copy)
     # print(_count_nodal_inflow_iterations)
 

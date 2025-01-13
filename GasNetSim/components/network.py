@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2024.
+#     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 11/11/24, 9:33 PM
+#     Last change on 1/2/25, 12:28 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -681,6 +681,7 @@ class Network:
         use_cuda=False,
         sparse_matrix=False,
         tracking_method="simple_mixing",
+        time_step=3600,
     ):
         logging.debug([x.volumetric_flow for x in self.nodes.values()])
 
@@ -725,6 +726,7 @@ class Network:
             self.update_connection_flow_rate()
             nodal_gas_inflow_composition = calculate_nodal_inflow_states(
                 self.nodes,
+                self.pipelines,
                 self.connections,
                 mapping_connections,
                 tracking_method=tracking_method,

@@ -112,12 +112,14 @@ def check_profiles(profiles):
     return profiles
 
 
-def run_snapshot(network, tol=0.01, use_cuda=False, tracking_method="simple_mixing"):
+def run_snapshot(
+    network, tol=0.01, use_cuda=False, tracking_method="simple_mixing", time_step=3600
+):
     # plot_network_demand_distribution(network)
     if use_cuda:
         is_cuda_available()
     network = network.simulation(
-        tol=tol, use_cuda=use_cuda, tracking_method=tracking_method
+        tol=tol, use_cuda=use_cuda, tracking_method=tracking_method, time_step=time_step
     )
     return network
 
@@ -172,10 +174,12 @@ def run_time_series(
     profiles,
     sep=";",
     profile_type="energy",
-    composition_tracking=False,
+    time_step=3600,  # 1 hour
+    tracking_method="simple_mixing",
     output_format="excel",
     output_filename="time_series_results",
     results_to_save=["nodal_pressure", "pipeline_flowrate", "nodal_gas_composition"],
+    use_cuda=False,
 ):
     """
     Run time series simulation for the network and save results in specified format.
@@ -240,7 +244,14 @@ def run_time_series(
             # for n in full_network.nodes.values():
             #     if n.volumetric_flow is not None and n.volumetric_flow < 0:
             #         print(n.volumetric_flow)
-            full_network = copy.deepcopy(run_snapshot(full_network))
+            full_network = copy.deepcopy(
+                run_snapshot(
+                    network=full_network,
+                    tracking_method=tracking_method,
+                    time_step=time_step,
+                    use_cuda=use_cuda,
+                )
+            )
             pressure_prev = full_network.save_pressure_values()
         except RuntimeError:
             # error_log.append([simplified_network, profiles.iloc[t]])
