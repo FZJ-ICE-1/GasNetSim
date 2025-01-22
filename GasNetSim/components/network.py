@@ -697,8 +697,8 @@ class Network:
         f_target = list_to_array(init_f, use_cuda=use_cuda)
         p = list_to_array(init_p, use_cuda=use_cuda)
         t = list_to_array(init_t, use_cuda=use_cuda)
-        logging.info(f"Initial pressure: {p}")
-        logging.info(f"Initial flow: {f_target}")
+        # logging.info(f"Initial pressure: {p}")
+        # logging.info(f"Initial flow: {f_target}")
 
         reference_nodes = [
             x - 1 for x in self.reference_nodes
@@ -851,7 +851,7 @@ class Network:
                 )
 
         logger.info(f"Simulation converges in {n_iter} iterations.")
-        logger.info(p)
+        # logger.info(p)
         # pipe_h2_fraction = list()
 
         for i_node in self.non_junction_nodes:
