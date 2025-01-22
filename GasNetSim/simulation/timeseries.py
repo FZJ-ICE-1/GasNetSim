@@ -253,7 +253,8 @@ def run_time_series(
                 )
             )
             pressure_prev = full_network.save_pressure_values()
-        except RuntimeError:
+        except (RuntimeError, TypeError) as e:
+            print(f"Caught an exception: {e}")
             # error_log.append([simplified_network, profiles.iloc[t]])
             error_log.append([full_network, profiles.iloc[t]])
 
