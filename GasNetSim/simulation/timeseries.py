@@ -18,20 +18,21 @@ from ..components.network import Network
 from ..components.utils.utils import plot_network_demand_distribution
 from ..components.utils.cuda_support import *
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.WARNING)
 
-
 VALID_RESULT_KEYS = [
     "nodal_pressure",
-    "pipeline_flowrate",
     "nodal_gas_composition",
     "nodal_HHV_MJ_per_sm3",
     "nodal_WI_MJ_per_sm3",
     "nodal_volume_flow_sm3_per_s",
     "nodal_energy_flow_MW",
+    "pipeline_flowrate",
+    "pipeline_batch_locations",
+    "pipeline_batch_hydrogen_fraction",
+    "pipeline_outflow_hydrogen_fraction"
 ]
 
 
@@ -68,7 +69,7 @@ def read_profiles(file_path, sep=";"):
 
 
 def print_progress_bar(
-    iteration, total, prefix="", suffix="", decimals=1, length=100, fill="█"
+        iteration, total, prefix="", suffix="", decimals=1, length=100, fill="█"
 ):
     """
     Call in a loop to create terminal progress bar.
@@ -113,13 +114,13 @@ def check_profiles(profiles):
 
 
 def run_snapshot(
-    network, tol=0.01, use_cuda=False, tracking_method="simple_mixing", time_step=3600
+        network, tol=0.01, max_iter=100, use_cuda=False, tracking_method="simple_mixing", time_step=3600
 ):
     # plot_network_demand_distribution(network)
     if use_cuda:
         is_cuda_available()
     network = network.simulation(
-        tol=tol, use_cuda=use_cuda, tracking_method=tracking_method, time_step=time_step
+        tol=tol, max_iter=max_iter, use_cuda=use_cuda, tracking_method=tracking_method, time_step=time_step
     )
     return network
 
@@ -150,7 +151,7 @@ def update_network_topology(network):
     remaining_pipes = dict()
     for i, pipe in list(network_resistances.items()):
         if (pipe.inlet_index in removed_nodes.keys()) or (
-            pipe.outlet_index in removed_nodes.keys()
+                pipe.outlet_index in removed_nodes.keys()
         ):
             pipe.valve = 1
         else:
@@ -170,16 +171,19 @@ def update_network_topology(network):
 
 
 def run_time_series(
-    network,
-    profiles,
-    sep=";",
-    profile_type="energy",
-    time_step=3600,  # 1 hour
-    tracking_method="simple_mixing",
-    output_format="excel",
-    output_filename="time_series_results",
-    results_to_save=["nodal_pressure", "pipeline_flowrate", "nodal_gas_composition"],
-    use_cuda=False,
+        network,
+        profiles,
+        sep=";",
+        profile_type="energy",
+        tolerance=0.01,
+        max_iter=20,
+        time_step=3600,  # 1 hour
+        tracking_method="simple_mixing",
+        save_to_file=True,
+        output_format="excel",
+        output_filename="time_series_results",
+        results_to_save=["nodal_pressure", "pipeline_flowrate", "nodal_gas_composition"],
+        use_cuda=False,
 ):
     """
     Run time series simulation for the network and save results in specified format.
@@ -208,8 +212,9 @@ def run_time_series(
 
     pressure_prev = None
 
+    full_network = copy.deepcopy(network)  # first time step
+
     for t in tqdm(time_steps):
-        full_network = copy.deepcopy(network)
         full_network.pressure_prev = (
             pressure_prev  # Nodal pressure values at previous time step
         )
@@ -248,21 +253,24 @@ def run_time_series(
                 run_snapshot(
                     network=full_network,
                     tracking_method=tracking_method,
+                    tol=tolerance,
+                    max_iter=max_iter,
                     time_step=time_step,
                     use_cuda=use_cuda,
                 )
             )
             pressure_prev = full_network.save_pressure_values()
         except (RuntimeError, TypeError) as e:
-            print(f"Caught an exception: {e}")
             # error_log.append([simplified_network, profiles.iloc[t]])
-            error_log.append([full_network, profiles.iloc[t]])
+            print(e)
+            error_log.append([e, full_network, profiles.iloc[t]])
 
         results = save_time_series_results(full_network, results, results_to_save)
     # Save simulation results to file
-    save_time_series_results_to_file(
-        results, time_steps, output_format, output_filename
-    )
+    if save_to_file:
+        save_time_series_results_to_file(
+            results, time_steps, output_format, output_filename
+        )
 
     return results
 
@@ -298,6 +306,16 @@ def save_time_series_results(network, results, results_to_save):
         "pipeline_flowrate": lambda: [
             pipe.flow_rate for pipe in network.pipelines.values()
         ],
+        "pipeline_batch_locations": lambda: [
+            pipe.batch_location_history for pipe in network.pipelines.values()
+        ],
+        "pipeline_batch_hydrogen_fraction": lambda: [
+            [composition[14] for composition in pipe.composition_history]
+            for pipe in network.pipelines.values()
+        ],
+        "pipeline_outflow_hydrogen_fraction": lambda: [
+            pipe.outflow_composition[14] for pipe in network.pipelines.values()
+        ],
         "nodal_HHV_MJ_per_sm3": lambda: [
             node.gas_mixture.HHV_J_per_sm3 / 1e6 for node in network.nodes.values()
         ],
@@ -323,10 +341,10 @@ def save_time_series_results(network, results, results_to_save):
 
 
 def save_time_series_results_to_file(
-    results: Dict[str, List],
-    time_steps: List[int],
-    output_format: str = "excel",
-    output_filename: str = "time_series_results",
+        results: Dict[str, List],
+        time_steps: List[int],
+        output_format: str = "excel",
+        output_filename: str = "time_series_results",
 ):
     """
     Save network.results to a file in the specified format.
@@ -343,7 +361,7 @@ def save_time_series_results_to_file(
             dataframes[key.replace("_", " ").title()] = pd.DataFrame(
                 data,
                 index=time_steps,
-                columns=[f"{label}_{i+1}" for i in range(len(data[0]))],
+                columns=[f"{label}_{i + 1}" for i in range(len(data[0]))],
             )
 
     # Ensure output directory exists for formats that need it
