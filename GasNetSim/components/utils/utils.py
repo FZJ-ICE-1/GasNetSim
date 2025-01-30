@@ -6,9 +6,7 @@
 #     Last change on 1/10/25, 3:41 PM
 #     Last change by yifei
 #    *****************************************************************************
-import copy
 import math
-
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -28,11 +26,11 @@ from ..pipeline import Pipeline
 
 
 def create_connection_matrix(
-    n_nodes: int,
-    components: dict,
-    component_type: int,
-    use_cuda=False,
-    sparse_matrix: bool = False,
+        n_nodes: int,
+        components: dict,
+        component_type: int,
+        use_cuda=False,
+        sparse_matrix: bool = False,
 ):
     row_ind = list()
     col_ind = list()
@@ -102,13 +100,13 @@ def check_batch_and_composition_lengths(batch_location_history, composition_hist
 
 
 def batch_tracking(
-    time_step,
-    velocity,
-    length,
-    inlet_composition,
-    outlet_composition,
-    batch_location_history,
-    composition_history,
+        time_step,
+        velocity,
+        length,
+        inlet_composition,
+        outlet_composition,
+        batch_location_history,
+        composition_history,
 ):
     """
     Batch tracking algorithm using lists for dynamic operations and NumPy arrays for calculations.
@@ -144,22 +142,22 @@ def batch_tracking(
 
     # Convert back to list for dynamic operations
     batch_location_history = batch_location_history.tolist()
+    composition_history = [row for row in composition_history]
 
-    # Handle batches exceeding the pipeline boundaries
-    new_batch_locations = []
-    new_compositions = []
-
-    for loc, comp in zip(batch_location_history, composition_history):
-        if 0 <= loc <= length:
-            new_batch_locations.append(loc)
-            new_compositions.append(comp)
-        elif loc > length and flow_direction == 1:
-            outlet_composition = comp
-        elif loc < 0 and flow_direction == -1:
-            inlet_composition = comp
-
-    batch_location_history = new_batch_locations
-    composition_history = new_compositions
+    # new_batch_locations = []
+    # new_compositions = []
+    #
+    # for loc, comp in zip(batch_location_history, composition_history):
+    #     if 0 <= loc <= length:
+    #         new_batch_locations.append(loc)
+    #         new_compositions.append(comp)
+    #     elif loc > length and flow_direction == 1:
+    #         outlet_composition = comp
+    #     elif loc < 0 and flow_direction == -1:
+    #         inlet_composition = comp
+    #
+    # batch_location_history = new_batch_locations
+    # composition_history = new_compositions
 
     # Handle new batch based on flow direction
     if flow_direction == 1:  # Forward flow
@@ -173,10 +171,8 @@ def batch_tracking(
     (
         batch_location_history,
         composition_history,
-        inlet_composition,
-        outlet_composition,
+        outflow_composition
     ) = clean_boundary_batches(
-        inlet_composition,
         outlet_composition,
         batch_location_history,
         composition_history,
@@ -187,18 +183,16 @@ def batch_tracking(
     return (
         batch_location_history,
         composition_history,
-        inlet_composition,
-        outlet_composition,
+        outflow_composition
     )
 
 
 def clean_boundary_batches(
-    inlet_composition,
-    outlet_composition,
-    batch_location_history,
-    composition_history,
-    length,
-    flow_direction,
+        outflow_composition,
+        batch_location_history,
+        composition_history,
+        length,
+        flow_direction,
 ):
     """
     Cleans up batches at the boundaries of the pipeline.
@@ -213,18 +207,17 @@ def clean_boundary_batches(
     """
     if flow_direction == 1:  # Forward flow
         while batch_location_history and batch_location_history[0] >= length:
-            outlet_composition = composition_history.pop(0)
+            outflow_composition = composition_history.pop(0)
             batch_location_history.pop(0)
     else:  # Reverse flow
         while batch_location_history and batch_location_history[-1] <= 0:
-            inlet_composition = composition_history.pop(-1)
+            outflow_composition = composition_history.pop(-1)
             batch_location_history.pop(-1)
 
     return (
         batch_location_history,
         composition_history,
-        inlet_composition,
-        outlet_composition,
+        outflow_composition
     )
 
 
@@ -240,7 +233,6 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
     batch_location_history = connection.batch_location_history
     length = connection.length
     velocity = connection.flow_velocity
-    outflow_composition = connection.outflow_composition
 
     # Record inflow gas mixture composition
     if velocity is None:
@@ -249,38 +241,32 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
     inlet_composition = connection.inlet.gas_mixture.eos_composition_tmp
     outlet_composition = connection.outlet.gas_mixture.eos_composition_tmp
 
-    if velocity >= 0:
-        inflow_composition = inlet_composition
-    else:
-        inflow_composition = outlet_composition
+    # if velocity >= 0:
+    #     outflow_composition = outlet_composition
+    # else:
+    #     outflow_composition = inlet_composition
+
+    inflow_composition = inlet_composition if velocity >= 0 else outlet_composition
+    outflow_composition = outlet_composition if velocity >= 0 else inlet_composition
 
     if method == "batch_tracking":
-        (
-            connection.batch_location_history,
-            connection.composition_history,
-            connection.inlet.gas_mixture.eos_composition_tmp,
-            connection.outlet.gas_mixture.eos_composition_tmp,
-        ) = batch_tracking(
-            time_step,
-            velocity,
-            length,
-            inlet_composition,
-            outlet_composition,
-            batch_location_history,
-            composition_history,
+        batch_location_history, composition_history, outflow_composition = batch_tracking(
+            time_step, velocity, length, inlet_composition, outlet_composition, batch_location_history,
+            composition_history
         )
-        if velocity >= 0:
-            outflow_composition = connection.outlet.gas_mixture.eos_composition_tmp
-        else:
-            outflow_composition = connection.inlet.gas_mixture.eos_composition_tmp
+        # outflow_composition = outlet_composition if velocity >= 0 else inlet_composition
+        # if velocity >= 0:
+        #     outflow_composition = connection.outlet.gas_mixture.eos_composition_tmp
+        # else:
+        #     outflow_composition = connection.inlet.gas_mixture.eos_composition_tmp
     elif method == "simple_mixing":
-        outflow_composition = copy.deepcopy(inflow_composition)
+        outflow_composition = inflow_composition
     else:
         print(f"Method {method} not implemented yet!")
 
-    connection.outflow_composition = outflow_composition
+    # connection.outflow_composition = outflow_composition
 
-    return connection
+    return batch_location_history, composition_history, outflow_composition
 
 
 def create_incidence_matrix(nodes, connections):
@@ -400,83 +386,64 @@ def allclose_with_nan(a, b, rtol=1e-03, atol=1e-04):
 
 
 def calculate_nodal_inflow_states(
-    nodes,
-    connections,
-    mapping_connections,
-    tracking_method="simple_mixing",
-    use_cuda=False,
-    time_step=0,
+        nodes,
+        pipelines,
+        cached_batch_information,
+        connections,
+        mapping_connections,
+        tracking_method="simple_mixing",
+        use_cuda=False,
+        time_step=3600,
 ):
     to_update = True
     _prev_nodal_composition_matrix = np.zeros((21, (len(nodes))))
 
     # _count_nodal_inflow_iterations = 0
-
-    connections_copy = copy.deepcopy(connections)
-    pipelines_copy = {
-        pipeline_id: connections_copy[connection_id]
-        for pipeline_id, pipeline in pipelines.items()
-        for connection_id, connection in connections.items()
-        if connection is pipeline
-    }
-
-    graph, edge_index = create_directed_graph_using_flow_directions(pipelines)
+    pipelines = {i + 1: c for i, c in connections.items() if type(c) == Pipeline}
+    graph, edge_index = create_directed_graph_using_flow_directions(connections)
     edge_orders = topological_sort_of_edges(graph, edge_index)
 
     while to_update:
+        # connections_copy = connections.copy()
+        # if tracking_method == "batch_tracking":
+        #     # reset pipeline.batch_location_history and pipeline.composition_history
+        #     for pipeline_id, pipeline in pipelines.items():
+        #         batch_history, composition_history = cached_batch_information[pipeline_id]
+        #         pipeline.batch_location_history = batch_history[:]
+        #         pipeline.composition_history = composition_history[:]
+
         # _count_nodal_inflow_iterations += 1
-        to_update = False  # Assume no updates initially
+        for connection_id in edge_orders:
+            if isinstance(connections[connection_id], Pipeline):
+                pipeline = connections[connection_id]
+                if tracking_method == "batch_tracking":
+                    batch_history, composition_history = cached_batch_information[pipeline.pipeline_index]
+                    pipeline.batch_location_history = batch_history[:]
+                    pipeline.composition_history = composition_history[:]
+                    pipeline.inlet = nodes[pipeline.inlet_index]
+                    pipeline.outlet = nodes[pipeline.outlet_index]
 
-        for i in edge_orders:
-            # Store the previous inlet and outlet compositions
-            previous_inlet_composition = pipelines_copy[
-                i
-            ].inlet.gas_mixture.eos_composition_tmp.copy()
-            previous_outlet_composition = pipelines_copy[
-                i
-            ].outlet.gas_mixture.eos_composition_tmp.copy()
+                (pipeline.batch_location_history,
+                 pipeline.composition_history,
+                 pipeline.outflow_composition,
+                 ) = gas_composition_tracking(pipeline, time_step=time_step, method=tracking_method)
 
-            # Perform gas composition tracking
-            pipelines_copy[i] = gas_composition_tracking(
-                pipelines_copy[i], time_step=time_step, method=tracking_method
-            )
+                if pipelines[pipeline.pipeline_index].outflow_composition is None:
+                    raise ValueError("Check the topological order!")
 
-            # Compare the current and previous compositions
-            current_inlet_composition = pipelines_copy[
-                i
-            ].inlet.gas_mixture.eos_composition_tmp
-            current_outlet_composition = pipelines_copy[
-                i
-            ].outlet.gas_mixture.eos_composition_tmp
+        _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
 
-            if not np.array_equal(
-                previous_inlet_composition, current_inlet_composition
-            ) or not np.array_equal(
-                previous_outlet_composition, current_outlet_composition
-            ):
-                to_update = True  # Mark as updated if any composition changes
-
-        # Recompute nodal composition matrix
-        _nodal_composition_matrix = create_nodal_composition_matrix(
-            nodes, connections_copy
-        )
-
-        # Update nodes with the new composition matrix
         nodes = update_temporary_nodal_gas_mixture_properties(
             nodes, _nodal_composition_matrix
         )
-
-        # Check for convergence
         if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
-            break  # Exit the loop if converged
+            to_update = False
+        else:
+            _prev_nodal_composition_matrix = _nodal_composition_matrix
 
-        _prev_nodal_composition_matrix = _nodal_composition_matrix
-
-    connections.update(connections_copy)
-    pipelines.update(pipelines_copy)
     # print(_count_nodal_inflow_iterations)
 
-    return _nodal_composition_matrix
+    return _nodal_composition_matrix, pipelines, nodes
 
 
 def update_temporary_nodal_gas_mixture_properties(nodes, nodal_composition_matrix):
@@ -491,8 +458,8 @@ def update_temporary_nodal_gas_mixture_properties(nodes, nodal_composition_matri
             pass
         else:
             nodes[_i + 1].gas_mixture.eos_composition_tmp = nodal_composition_matrix[
-                :, _i
-            ]
+                                                            :, _i
+                                                            ]
             # nodes[_i+1].gas_mixture.update_gas_mixture()
     return nodes
 
@@ -524,7 +491,7 @@ def calculate_flow_matrix(network, pressure_bar):
         temp = connection.calculate_coefficient_for_iteration()
 
         flow_rate = (
-            flow_direction * abs(p1**2 - p2**2 - slope_correction) ** (1 / 2) * temp
+                flow_direction * abs(p1 ** 2 - p2 ** 2 - slope_correction) ** (1 / 2) * temp
         )
 
         flow_mat[i][j] = -flow_rate

@@ -715,6 +715,16 @@ class Network:
 
         err = tol + 1  # ensure the first loop will be executed
 
+        # temporary cache of (batch_history, composition_history)
+        if tracking_method == "batch_tracking":
+            cached_batch_information = {
+                i: (pipeline.batch_location_history.copy(),
+                    pipeline.composition_history.copy())
+                for i, pipeline in self.pipelines.items()
+            }
+        else:
+            cached_batch_information = {}
+
         while err > tol:
             j_mat, f_mat = self.jacobian_matrix(
                 use_cuda=use_cuda, sparse_matrix=sparse_matrix
@@ -724,9 +734,16 @@ class Network:
                 node.gas_mixture.eos_composition_tmp = node.gas_mixture.eos_composition
 
             self.update_connection_flow_rate()
-            nodal_gas_inflow_composition = calculate_nodal_inflow_states(
+
+            if tracking_method == "batch_tracking":
+                for i, pipeline in self.pipelines.items():
+                    pipeline.batch_location_history = cached_batch_information[i][0][:]
+                    pipeline.composition_history = cached_batch_information[i][1][:]
+
+            nodal_gas_inflow_composition, self.pipelines, self.nodes = calculate_nodal_inflow_states(
                 self.nodes,
                 self.pipelines,
+                cached_batch_information,
                 self.connections,
                 mapping_connections,
                 tracking_method=tracking_method,
@@ -787,6 +804,7 @@ class Network:
             )
             logging.debug(delta_p)
 
+            # Add 0 to the delta_p vector for referece nodes
             for i in self.non_junction_nodes:
                 if use_cuda:
                     delta_p = cp.concatenate(
