@@ -104,6 +104,7 @@ def read_pipelines(
     for row_index, row in df_pipe.iterrows():
         friction_method = row.get("friction_method", "chen") or "chen"
         pipelines[row["pipeline_index"]] = Pipeline(
+            pipeline_index=row["pipeline_index"],
             inlet=network_nodes[row["inlet_index"]],
             outlet=network_nodes[row["outlet_index"]],
             diameter=row["diameter_m"],
