@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import warnings
+from scipy.constants import atm
 
 from ..network import Network
 from ..node import Node
@@ -55,6 +56,10 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
         base_composition = COMMON_GAS_COMPOSITIONS["NATURAL_GAS_gri30"]
 
     for _, row in df_node.iterrows():
+        # Convert gauge pressure to absolute pressure
+        gauge_pressure_pa = row["pressure_pa"]
+        absolute_pressure_pa = gauge_pressure_pa + atm if gauge_pressure_pa is not None else None
+
         if row["gas_composition"] is not None:
             gas_composition_str = row["gas_composition"]
 
@@ -69,7 +74,7 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
 
         nodes[row["node_index"]] = Node(
             node_index=row["node_index"],
-            pressure_pa=row["pressure_pa"],
+            pressure_pa=absolute_pressure_pa,
             volumetric_flow=row["flow_sm3_per_s"],
             energy_flow=row["flow_MW"],
             temperature=row["temperature_k"],
