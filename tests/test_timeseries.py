@@ -67,6 +67,7 @@ class BaseTestNetwork(unittest.TestCase):
 
         # Create pipelines
         self.pipe1 = Pipeline(
+            pipeline_index=1,
             inlet=self.node1,
             outlet=self.node2,
             diameter=0.5,
@@ -74,6 +75,7 @@ class BaseTestNetwork(unittest.TestCase):
             efficiency=0.85,
         )
         self.pipe2 = Pipeline(
+            pipeline_index=2,
             inlet=self.node2,
             outlet=self.node3,
             diameter=0.5,
@@ -81,6 +83,7 @@ class BaseTestNetwork(unittest.TestCase):
             efficiency=0.85,
         )
         self.pipe3 = Pipeline(
+            pipeline_index=3,
             inlet=self.node1,
             outlet=self.node3,
             diameter=0.5,
