@@ -103,8 +103,8 @@ def batch_tracking(
         time_step,
         velocity,
         length,
-        inlet_composition,
-        outlet_composition,
+        inflow_composition,
+        outflow_composition,
         batch_location_history,
         composition_history,
 ):
@@ -114,8 +114,8 @@ def batch_tracking(
     :param time_step: Time step for the simulation [s].
     :param velocity: Gas flow velocity [m/s], positive for forward, negative for reverse.
     :param length: Pipeline length [m].
-    :param inlet_composition: 21-element numpy array for inlet composition.
-    :param outlet_composition: 21-element numpy array for outlet composition.
+    :param inflow_composition: 21-element numpy array for inflow gas composition.
+    :param outflow_composition: 21-element numpy array for outflow gas composition.
     :param batch_location_history: List of batch locations.
     :param composition_history: List of batch compositions.
     """
@@ -126,8 +126,7 @@ def batch_tracking(
         return (
             batch_location_history,
             composition_history,
-            inlet_composition,
-            outlet_composition,
+            outflow_composition
         )
 
     # Convert to NumPy arrays for vectorized calculations
@@ -162,10 +161,10 @@ def batch_tracking(
     # Handle new batch based on flow direction
     if flow_direction == 1:  # Forward flow
         batch_location_history.append(0)
-        composition_history.append(inlet_composition)
+        composition_history.append(inflow_composition)
     else:  # Reverse flow
         batch_location_history.insert(0, length)
-        composition_history.insert(0, outlet_composition)
+        composition_history.insert(0, inflow_composition)
 
     # Clean boundary batches
     (
@@ -173,7 +172,7 @@ def batch_tracking(
         composition_history,
         outflow_composition
     ) = clean_boundary_batches(
-        outlet_composition,
+        outflow_composition,
         batch_location_history,
         composition_history,
         length,
@@ -197,8 +196,7 @@ def clean_boundary_batches(
     """
     Cleans up batches at the boundaries of the pipeline.
 
-    :param inlet_composition: Current inlet composition.
-    :param outlet_composition: Current outlet composition.
+    :param outflow_composition: Composition of the gas outflow
     :param batch_location_history: List of batch locations.
     :param composition_history: List of batch compositions.
     :param length: Length of the pipeline [m].
@@ -251,7 +249,7 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
 
     if method == "batch_tracking":
         batch_location_history, composition_history, outflow_composition = batch_tracking(
-            time_step, velocity, length, inlet_composition, outlet_composition, batch_location_history,
+            time_step, velocity, length, inflow_composition, outflow_composition, batch_location_history,
             composition_history
         )
         # outflow_composition = outlet_composition if velocity >= 0 else inlet_composition
