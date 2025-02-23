@@ -27,6 +27,7 @@ class Pipeline:
 
     def __init__(
         self,
+        pipeline_index: int,
         inlet: Node,
         outlet: Node,
         diameter,
@@ -51,7 +52,7 @@ class Pipeline:
         :param ambient_temp: Pipe surrounding temperature [K]
         :param ambient_pressure: Pipe surrounding temperature [Pa]
         """
-
+        self.pipeline_index = pipeline_index
         self.inlet = inlet
         self.outlet = outlet
         self.inlet_index = inlet.index

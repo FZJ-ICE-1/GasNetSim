@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2024.
+#     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 11/11/24, 9:33 PM
+#     Last change on 1/2/25, 12:28 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -681,6 +681,7 @@ class Network:
         use_cuda=False,
         sparse_matrix=False,
         tracking_method="simple_mixing",
+        time_step=3600,
     ):
         logging.debug([x.volumetric_flow for x in self.nodes.values()])
 
@@ -696,8 +697,8 @@ class Network:
         f_target = list_to_array(init_f, use_cuda=use_cuda)
         p = list_to_array(init_p, use_cuda=use_cuda)
         t = list_to_array(init_t, use_cuda=use_cuda)
-        logging.info(f"Initial pressure: {p}")
-        logging.info(f"Initial flow: {f_target}")
+        # logging.info(f"Initial pressure: {p}")
+        # logging.info(f"Initial flow: {f_target}")
 
         reference_nodes = [
             x - 1 for x in self.reference_nodes
@@ -714,6 +715,16 @@ class Network:
 
         err = tol + 1  # ensure the first loop will be executed
 
+        # temporary cache of (batch_history, composition_history)
+        if tracking_method == "batch_tracking":
+            cached_batch_information = {
+                i: (pipeline.batch_location_history.copy(),
+                    pipeline.composition_history.copy())
+                for i, pipeline in self.pipelines.items()
+            }
+        else:
+            cached_batch_information = {}
+
         while err > tol:
             j_mat, f_mat = self.jacobian_matrix(
                 use_cuda=use_cuda, sparse_matrix=sparse_matrix
@@ -723,8 +734,16 @@ class Network:
                 node.gas_mixture.eos_composition_tmp = node.gas_mixture.eos_composition
 
             self.update_connection_flow_rate()
-            nodal_gas_inflow_composition = calculate_nodal_inflow_states(
+
+            if tracking_method == "batch_tracking":
+                for i, pipeline in self.pipelines.items():
+                    pipeline.batch_location_history = cached_batch_information[i][0][:]
+                    pipeline.composition_history = cached_batch_information[i][1][:]
+
+            nodal_gas_inflow_composition, self.pipelines, self.nodes = calculate_nodal_inflow_states(
                 self.nodes,
+                self.pipelines,
+                cached_batch_information,
                 self.connections,
                 mapping_connections,
                 tracking_method=tracking_method,
@@ -785,6 +804,7 @@ class Network:
             )
             logging.debug(delta_p)
 
+            # Add 0 to the delta_p vector for referece nodes
             for i in self.non_junction_nodes:
                 if use_cuda:
                     delta_p = cp.concatenate(
@@ -849,7 +869,7 @@ class Network:
                 )
 
         logger.info(f"Simulation converges in {n_iter} iterations.")
-        logger.info(p)
+        # logger.info(p)
         # pipe_h2_fraction = list()
 
         for i_node in self.non_junction_nodes:
