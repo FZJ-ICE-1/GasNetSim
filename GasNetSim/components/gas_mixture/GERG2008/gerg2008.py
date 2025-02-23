@@ -336,7 +336,6 @@ class GasMixtureGERG2008:
             self.isentropic_exponent = properties[16]  # Isentropic exponent
 
             self.R_specific = properties[19]
-            self.viscosity = 2e-5  # TODO add function
 
             self.HHV_J_per_m3 = CalculateHeatingValue_numba(
                 MolarMass=self.MolarMass,

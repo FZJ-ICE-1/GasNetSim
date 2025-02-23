@@ -15,6 +15,9 @@ from scipy.constants import atm, zero_Celsius
 from .GERG2008.gerg2008 import *
 from .GERG2008.gerg2008_constants import *
 from .GERG2008.gerg2008 import convert_to_gerg2008_composition
+from .viscosity import calculate_viscosity
+from .viscosity import ViscosityMethod
+
 
 # from .heating_value import calc_heating_value
 
@@ -25,7 +28,7 @@ class GasMixture:
     """
 
     def __init__(
-        self, pressure, temperature, composition: OrderedDict, method="GERG-2008"
+        self, pressure, temperature, composition: OrderedDict, method="GERG-2008", viscosity_method="Herning-Zipperer"
     ):
         """
 
@@ -38,6 +41,7 @@ class GasMixture:
         self.temperature = temperature
         self.composition = composition
         self.method = method
+        self.viscosity_method = viscosity_method
         self.convert_composition_format()
         self.update_gas_mixture()
 
@@ -125,10 +129,10 @@ class GasMixture:
 
     @property
     def viscosity(self):
-        if self.method == "PREOS":
-            return self.thermo_mixture.mu
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.viscosity
+        if self.viscosity_method == "Herning-Zipperer":
+            return calculate_viscosity(self.temperature, self.pressure, self.eos_composition, ViscosityMethod.HERNING_ZIPPERER)
+        elif self.viscosity_method == "Lucas":
+            return calculate_viscosity(self.temperature, self.pressure, self.eos_composition, ViscosityMethod.LUCAS)
 
     @property
     def heat_capacity_constant_pressure(self):
