@@ -13,6 +13,8 @@ from numba import njit, float64
 
 from .functions.viscosity_methods.base_method import ViscosityCalculator, MixtureProperties, GAS_PROPERTIES, R_GAS
 from .functions.viscosity_methods.herning_zipperer import HerningZippererCalculator
+from .functions.viscosity_methods.lohrenz_bray_clark import LBCViscosityCalculator
+from .functions.viscosity_methods.lucas import LucasViscosityCalculator
 
 
 class ViscosityMethod(Enum):
@@ -22,6 +24,7 @@ class ViscosityMethod(Enum):
     TRAPP = "trapp"
     HERNING_ZIPPERER = "herning_zipperer"
     CHUNG = "chung"
+    LBC = "lohrenz_bray_clark"
 
 class ViscosityCalculatorFactory:
     """Factory for creating viscosity calculators"""
@@ -73,6 +76,7 @@ def calculate_viscosity(T: float, P: float, composition, method=ViscosityMethod.
 # Import and register calculators
 from .functions.viscosity_methods.lucas import LucasViscosityCalculator
 from .functions.viscosity_methods.herning_zipperer import HerningZippererCalculator
+from .functions.viscosity_methods.lohrenz_bray_clark import LBCViscosityCalculator
 # from ..viscosity_methods.chapman_enskog import ChapmanEnskogCalculator
 # from ..viscosity_methods.trapp import TrappCalculator
 # from ..viscosity_methods.chung import ChungCalculator
@@ -82,6 +86,7 @@ ViscosityCalculatorFactory.register_calculator(ViscosityMethod.LUCAS, LucasVisco
 # ViscosityCalculatorFactory.register_calculator(ViscosityMethod.TRAPP, TrappCalculator)
 ViscosityCalculatorFactory.register_calculator(ViscosityMethod.HERNING_ZIPPERER, HerningZippererCalculator)
 # ViscosityCalculatorFactory.register_calculator(ViscosityMethod.CHUNG, ChungCalculator)
+ViscosityCalculatorFactory.register_calculator(ViscosityMethod.LBC, LBCViscosityCalculator)
 
 # Define what's available when importing *
 __all__ = [
@@ -94,5 +99,6 @@ __all__ = [
     # 'ChapmanEnskogCalculator',
     # 'TrappCalculator',
     'HerningZippererCalculator',
-    # 'ChungCalculator'
+    # 'ChungCalculator',
+    'LBCViscosityCalculator'
 ]
