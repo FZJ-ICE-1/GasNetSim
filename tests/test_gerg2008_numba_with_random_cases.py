@@ -27,6 +27,7 @@ from numpy.testing import assert_almost_equal, assert_allclose
 from scipy.constants import bar
 
 from GasNetSim.components.gas_mixture.GERG2008 import *
+from GasNetSim.components.gas_mixture.functions.heating_values import CalculateHeatingValue_numba
 
 
 def test_heating_value_100iter():

@@ -7,11 +7,12 @@
 #     Last change by yifei
 #    *****************************************************************************
 import math
+import json
+from pathlib import Path
 from numba import njit, float64, types, int32, boolean
 from numba.extending import overload
 
 from .gerg2008_constants import *
-from .gerg2008 import number_of_atoms
 
 
 @njit(float64(float64), fastmath=True)
@@ -143,158 +144,6 @@ def ReducingParametersGERG_numba_sub(x):
         Dr = 1.0 / Vr
 
     return Tr, Dr
-
-
-# def ConvertCompositionGERG_numba(composition):
-#     pass
-#
-#
-# # @staticmethod
-# @overload(ConvertCompositionGERG_numba)
-# def ConvertCompositionGERG_numba(composition):
-#     """
-#         Converts a dictionary representing gas compositions into a GERG composition list.
-#         https://numba.readthedocs.io/en/stable/reference/pysupported.html#typed-dict
-#
-#         Inputs:
-#             composition (dict): A dictionary containing gas species and their compositions.
-#
-#         return:
-#             gerg_composition (list): A list representing the GERG composition of gases.
-#     """
-#     gerg_composition = np.zeros(21)
-#     global gerg_gas_spices
-#
-#     for gas_spice, composition in composition.items():
-#         gerg_composition[np.where(gerg_gas_spices == gas_spice)] = composition
-#
-#     return np.array(gerg_composition)
-
-
-@njit(float64(float64, float64, float64[:], boolean, boolean, float64))
-def CalculateHeatingValue_numba(
-    MolarMass, MolarDensity, comp, hhv, per_mass, reference_temp
-):
-    """
-    Calculate the heating value of a gas mixture based on its composition and other properties.
-
-    Inputs:
-        MolarMass (float64): The molar mass of the gas mixture.
-        MolarDensity (float64): The molar density of the gas mixture.
-        comp (np.array): A dictionary representing the composition of the gas mixture.
-        hhv (bool): True for Higher Heating Value (HHV) calculation, False for Lower Heating Value (LHV) calculation.
-        per_mass (bool): Specifies the parameter for heating value calculation. Options: 'mass' or 'volume'.
-        reference_temp (float64): The reference temperature for the heating value calculation. Default is 25 degree Celsius.
-
-    return:
-        heating_value (float64): The calculated heating value based on the provided parameters.
-    """
-    # 298 K
-    # dict_enthalpy_mole = {'methane': -74602.416533355,
-    #                       'nitrogen': 0.0,
-    #                       'carbon dioxide': -393517.79827154,
-    #                       'ethane': -83856.2627150042,
-    #                       'propane': -103861.117481869,
-    #                       'isobutane': -135360.0,
-    #                       'n-butane': -125849.99999999999,
-    #                       'isopentane': -178400.0,
-    #                       'n-pentane': -173500.0,
-    #                       'n-hexane': -198490.0,
-    #                       'n-heptane': -223910.0,
-    #                       'n-hctane': -249730.0,
-    #                       'n-nonane': -274700.0,
-    #                       'n-decane': -300900.0,
-    #                       'hydrogen': 0.0,
-    #                       'oxygen': -4.40676212751828,
-    #                       'carbon monoxide': -110525.0,
-    #                       'water': -241833.418361837,
-    #                       'hydrogen sulfide': -20600.0,
-    #                       'helium': 0.0,
-    #                       'argon': 0.0,
-    #                       'carbon': 0.0}
-    #                       # 'H': 218000.0,
-    #                       # 'O': 249190.0,
-    #                       # 'SO2': -296840.0}
-
-    # 273 K
-    enthalpy_mole = np.array(
-        [
-            -75483.51423273719,  # methane
-            0.0,  # nitrogen
-            -394431.82606764464,  # carbon dioxide
-            -83856.2627150042,  # ethane
-            -103861.117481869,  # propane
-            -135360.0,  # isobutane
-            -125849.99999999999,  # n-butane
-            -178400.0,  # isopentane
-            -173500.0,  # n-pentane
-            -198490.0,  # n-hexane
-            -223910.0,  # n-heptane
-            -249730.0,  # n-octane
-            -274700.0,  # n-nonane
-            -300900.0,  # n-decane
-            0.0,  # hydrogen
-            -4.40676212751828,  # oxygen
-            -111262.34509634285,  # carbon monoxide
-            -242671.7203547155,  # water
-            -20600.0,  # hydrogen sulfide
-            0.0,  # helium
-            0.0,  # argon
-            -296840.0,
-        ]
-    )  # sulfur dioxide
-
-    atom_list = number_of_atoms * comp[:, np.newaxis]
-    reactants_atom = np.sum(atom_list, axis=0)
-
-    # products
-    n_CO2 = reactants_atom[1]
-    n_SO2 = reactants_atom[6]
-    n_H2O = reactants_atom[2] / 2
-    products_dict = np.array([n_CO2, n_SO2, n_H2O])
-
-    # oxygen for complete combustion
-    n_O = (
-        n_CO2 * 2 + n_SO2 * 2 + n_H2O * 1
-    )  # 2 is number of O atoms in CO2 AND SO2 and 1 is number of O atoms in H2O
-    n_O2 = n_O / 2
-    reactants_dict = np.copy(comp)
-    reactants_dict[15] = n_O2
-    # reactants_dict.update({'oxygen': n_O2})
-
-    # LHV calculation
-    LHV = (reactants_dict * enthalpy_mole[:-1]).sum() - (
-        products_dict * np.take(enthalpy_mole, [2, 21, 17])
-    ).sum()
-
-    # enthalpy of formation of water at different temperatures, data obtained using cantera
-    supported_temps = [25.0, 15.0]
-
-    if reference_temp == 25.0:
-        hw_liq, hw_gas = -285839.09854950657, -241824.62162536496
-    elif reference_temp == 15.0:
-        hw_liq, hw_gas = -286593.59823661513, -242160.26451330166
-    else:
-        print(
-            f"Unsupported reference temperature: {reference_temp} degree Celsius. Use one of {supported_temps}."
-        )
-
-    HHV = LHV + (hw_gas - hw_liq) * products_dict[2]
-
-    if per_mass:
-        # returns heating value in J/kg
-        if hhv:
-            heating_value = HHV / MolarMass * 1e3
-        else:
-            heating_value = LHV / MolarMass * 1e3
-    else:
-        # returns heating value in J/m3
-        if hhv:
-            heating_value = HHV * MolarDensity * 1e3
-        else:
-            heating_value = LHV * MolarDensity * 1e3
-
-    return heating_value
 
 
 @njit(float64(float64, float64[:]))

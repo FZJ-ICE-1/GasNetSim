@@ -255,6 +255,28 @@ files = [
 ]
 
 [[package]]
+name = "chemicals"
+version = "1.3.2"
+description = "Chemical properties component of Chemical Engineering Design Library (ChEDL)"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "chemicals-1.3.2-py3-none-any.whl", hash = "sha256:5ca861f89686978f281dfaf1a4c9fc42fdec34e89e11ab2a910120a25a6a7e8d"},
+    {file = "chemicals-1.3.2.tar.gz", hash = "sha256:902e21517aa7f88ac42404f843552f8c9c1f4e357f00398bbd6fc85757e5b208"},
+]
+
+[package.dependencies]
+fluids = ">=1.1.0"
+numpy = "*"
+pandas = "*"
+scipy = ">=1.6.0"
+
+[package.extras]
+coverage-documentation = ["coverage (>=4.0.3)", "wsgiref (>=0.1.2)"]
+
+[[package]]
 name = "click"
 version = "8.1.8"
 description = "Composable command line interface toolkit"
@@ -370,6 +392,66 @@ test = ["Pillow", "contourpy[test-no-images]", "matplotlib"]
 test-no-images = ["pytest", "pytest-cov", "pytest-rerunfailures", "pytest-xdist", "wurlitzer"]
 
 [[package]]
+name = "coolprop"
+version = "6.7.0"
+description = "Open-source thermodynamic and transport properties database"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "CoolProp-6.7.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:4398ce52daddd83f19c18b825bc94cf23b072bd116ef14297df3463708b7bbd6"},
+    {file = "CoolProp-6.7.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:339e4447c6ab92a0dc49f1ea379f571953fe781399e93b7cd6c833f2b8bde337"},
+    {file = "CoolProp-6.7.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7824aea6d83177292fa5a63912bd75808e0cdc68332c7e38225770c768402826"},
+    {file = "CoolProp-6.7.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e8b6d5550eb7ffe305ec30a1e0c0dccd63e129d1d054682e30b88a13e5971b1d"},
+    {file = "CoolProp-6.7.0-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:6380860dd7f0aba17710f60608af8c6370aac5c3de4962f762a21ace72376d29"},
+    {file = "CoolProp-6.7.0-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:791bee46593756129fb786a7c708bf5e937ed3ff283d01c97667950b1ea2a28b"},
+    {file = "CoolProp-6.7.0-cp310-cp310-win32.whl", hash = "sha256:49c8b332adbc5cb1696bec66caaf154bc993606e088ccc0e75cebc1c6b5fc325"},
+    {file = "CoolProp-6.7.0-cp310-cp310-win_amd64.whl", hash = "sha256:730fc10fa8ac02737c86e3a1659a92e50306b1ba163bf7037ed70a973606ea59"},
+    {file = "CoolProp-6.7.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:6615b9817f79220dea4d1f09a647c841b072febd7e4671df91c9c9496e814179"},
+    {file = "CoolProp-6.7.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:8d6b5bc0fa210ade64d5e98f0f020305ceb58eb9ef7a6e89fb5a1caefb24e48d"},
+    {file = "CoolProp-6.7.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:65505e4180e13313c53ff1a24614ee35d41b6bbd5805e820bb32355ca6b034e2"},
+    {file = "CoolProp-6.7.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b5853f27f153812c8249fb2543939005441998a1230dc71e4fc3dc7fb8626fa7"},
+    {file = "CoolProp-6.7.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:ec5423273876f3e5afde9bb145de995481178f1fdde52ff62f4236a515a08612"},
+    {file = "CoolProp-6.7.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:c5f839284af74837f48a577531e7f9c9f030ba20ed70f8222159e99d2da54d2c"},
+    {file = "CoolProp-6.7.0-cp311-cp311-win32.whl", hash = "sha256:f301a954231fa1344afdd559b689687a18bf5252746da9b333cd857794f39645"},
+    {file = "CoolProp-6.7.0-cp311-cp311-win_amd64.whl", hash = "sha256:7f74cb4666438cc52bac51c4b79d19a05ba1ec0e4db42b90250e98982c88dcf6"},
+    {file = "CoolProp-6.7.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:f81e14d17ecbb72942c9d0a7a216c47626138d51198118af0c77a992b0865c17"},
+    {file = "CoolProp-6.7.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:af655c4410b20fdd65322d6770bc30f4b01e461abd00ac3ccbcb9fa7dc71b87b"},
+    {file = "CoolProp-6.7.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:293aa9e721bdc0fab1912a8d732a32c9b346a97eb4a4e69d17655e25ad8b8a4a"},
+    {file = "CoolProp-6.7.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f318cf5f6cbf6629a15e126b23f4c83d2f97eec5753553408e85840b10f4115f"},
+    {file = "CoolProp-6.7.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:230c30cf51ab47d4ed18fbc8f6a4a3479b498acbf4ca88beceabe307619843d8"},
+    {file = "CoolProp-6.7.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:18b91d89b29a2b74c52cb08d0d0f289a3b26ef5f88199cc6db5503d09e9e11b0"},
+    {file = "CoolProp-6.7.0-cp312-cp312-win32.whl", hash = "sha256:edcb45a8ecba126fd3580735bd3dde603cfd79c500e1792782646a7141ed2989"},
+    {file = "CoolProp-6.7.0-cp312-cp312-win_amd64.whl", hash = "sha256:8072086925bda20285f1915be4a9cd04da874aac314003d838a787e8d9ed5b84"},
+    {file = "CoolProp-6.7.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:b3f66bb2ad2331652da21f2b3537207857515f0f0aba6214348a3a94f2ec4382"},
+    {file = "CoolProp-6.7.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:a450316dc1bcaa21d042ef69a3bd8fd222ca33b45e0e638ba161a62c6386cfad"},
+    {file = "CoolProp-6.7.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5b464e267b47f2ffa46a612b81e284fd083b861370c4b8eb1a64bf12af6b665d"},
+    {file = "CoolProp-6.7.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bd0d7f545bcb7798b14786389165f0b55495dd2ffecd1e896a0e3c1412a59e28"},
+    {file = "CoolProp-6.7.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:f501708660d9d10a89b7fca7149ffdc17ea1bf594978c7e048467426e4745293"},
+    {file = "CoolProp-6.7.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:23d4b310cb0c3fb1580471f396def346f30365415761659b2dd4436e0c9a7e5c"},
+    {file = "CoolProp-6.7.0-cp313-cp313-win32.whl", hash = "sha256:5a34fb2a765acb8300f675174db3b9769f3154b5ad97fdabf7c0fcaa125d1707"},
+    {file = "CoolProp-6.7.0-cp313-cp313-win_amd64.whl", hash = "sha256:33182a01d744883e647cba5bbfa70df586db9370bddec932fce17782bbd37deb"},
+    {file = "CoolProp-6.7.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:74032b027600a96bcc97c508321e2d2a548a31a407005323509b22485cdaa4b3"},
+    {file = "CoolProp-6.7.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:98a3061d1c8864aa1fd2cb3a58af1ed799d218254dbb0b5d8877722799e091e6"},
+    {file = "CoolProp-6.7.0-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:494f57078c468e9437b0e7a59fcdc78584c7c994e4cbf054a8df15d14a2fd860"},
+    {file = "CoolProp-6.7.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c1b535afa624352a1c21492f0682a1be0385fab37da4aa5c1264bb9507e2550b"},
+    {file = "CoolProp-6.7.0-cp38-cp38-musllinux_1_2_aarch64.whl", hash = "sha256:494af2b37abb0c5f1a27c9afc9608a501ed0b7cbc0cf57404118e85fdd781ca6"},
+    {file = "CoolProp-6.7.0-cp38-cp38-musllinux_1_2_x86_64.whl", hash = "sha256:d41e1d8c95ec4da5465d2ba98203e790c1eedb1d1d9551ebb2d29565a90f8ffc"},
+    {file = "CoolProp-6.7.0-cp38-cp38-win32.whl", hash = "sha256:3309c60704faed4c93a476ccb828e1c183aee7d92a2fb01d35e32387a4a67ba9"},
+    {file = "CoolProp-6.7.0-cp38-cp38-win_amd64.whl", hash = "sha256:a0b8be27a04c7691c5e5b99120ca9d1d65b0ec0807c96379dd90952770309998"},
+    {file = "CoolProp-6.7.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:e34d71024938fd5d2280c1eee2d418da41686e96296c3729bfa7928114bcf813"},
+    {file = "CoolProp-6.7.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:9302d1f3f10b37845d7a91421729cc8b244f54312109b0ac7fee5b948b0947dc"},
+    {file = "CoolProp-6.7.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:24c55f9935ad0b2b348ed3146f2f0af23920081b90644cd30b0b3d0dbfa7e558"},
+    {file = "CoolProp-6.7.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:43d435347c2155e4174804c4a7e7e8522327ed53f8c87d14498f4d518c02c709"},
+    {file = "CoolProp-6.7.0-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:b474cb32a24bde4a524deae032671aa4adc61b9ca493c175a5de7a1b02b19a40"},
+    {file = "CoolProp-6.7.0-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:7d6a69cf0a84314a43d46e965717440f35e6effe9aa23f4266ec7fd15cf03ed6"},
+    {file = "CoolProp-6.7.0-cp39-cp39-win32.whl", hash = "sha256:4ffbacf0c32651e85f8d11a459430003c27414387d7eebf18bb555aab55ec645"},
+    {file = "CoolProp-6.7.0-cp39-cp39-win_amd64.whl", hash = "sha256:1125c4a4d114570a26f885c394021d71436320df12d8db1616a7b77d70b37547"},
+    {file = "coolprop-6.7.0.tar.gz", hash = "sha256:309bbd5f490afa798f12bc94067c56779ad82712319a0f5d70b97e23b387f778"},
+]
+
+[[package]]
 name = "cycler"
 version = "0.12.1"
 description = "Composable style cycles"
@@ -416,6 +498,26 @@ files = [
 docs = ["furo (>=2024.8.6)", "sphinx (>=8.1.3)", "sphinx-autodoc-typehints (>=3)"]
 testing = ["covdefaults (>=2.3)", "coverage (>=7.6.10)", "diff-cover (>=9.2.1)", "pytest (>=8.3.4)", "pytest-asyncio (>=0.25.2)", "pytest-cov (>=6)", "pytest-mock (>=3.14)", "pytest-timeout (>=2.3.1)", "virtualenv (>=20.28.1)"]
 typing = ["typing-extensions (>=4.12.2)"]
+
+[[package]]
+name = "fluids"
+version = "1.1.0"
+description = "Fluid dynamics component of Chemical Engineering Design Library (ChEDL)"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "fluids-1.1.0-py3-none-any.whl", hash = "sha256:8ddfe29a6ef4fbb4b9107ee821568cbb3e9120f4572903bda48b24037b0fdd1f"},
+    {file = "fluids-1.1.0.tar.gz", hash = "sha256:bad78e4530f0778ee4a63dc65c724af409d00810aa3fa7042f2a851fcae5210b"},
+]
+
+[package.dependencies]
+numpy = ">=1.5.0"
+scipy = ">=1.6.0"
+
+[package.extras]
+coverage-documentation = ["coverage (>=4.0.3)", "pint", "wsgiref (>=0.1.2)"]
 
 [[package]]
 name = "fonttools"
@@ -928,7 +1030,7 @@ version = "1.26.4"
 description = "Fundamental package for array computing in Python"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "numpy-1.26.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:9ff0f4f29c51e2803569d7a51c2304de5554655a60c5d776e35b4a41413830d0"},
@@ -988,7 +1090,7 @@ version = "2.2.3"
 description = "Powerful data structures for data analysis, time series, and statistics"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "pandas-2.2.3-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:1948ddde24197a0f7add2bdc4ca83bf2b1ef84a1bc8ccffd95eda17fd836ecb5"},
@@ -1472,7 +1574,7 @@ version = "2.9.0.post0"
 description = "Extensions to the standard Python datetime module"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["main"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
@@ -1488,7 +1590,7 @@ version = "2025.1"
 description = "World timezone definitions, modern and historical"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "pytz-2025.1-py2.py3-none-any.whl", hash = "sha256:89dd22dca55b46eac6eda23b2d72721bf1bdfef212645d81513ef5d03038de57"},
@@ -1665,7 +1767,7 @@ version = "1.13.1"
 description = "Fundamental algorithms for scientific computing in Python"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "scipy-1.13.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:20335853b85e9a49ff7572ab453794298bcf0354d8068c5f6775a0eabf350aca"},
@@ -1814,12 +1916,34 @@ version = "1.17.0"
 description = "Python 2 and 3 compatibility utilities"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["main"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
 ]
+
+[[package]]
+name = "thermo"
+version = "0.4.1"
+description = "Chemical properties component of Chemical Engineering Design Library (ChEDL)"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "thermo-0.4.1-py3-none-any.whl", hash = "sha256:ca3a11d1cfefb8d26fced4529305be35b1b59bc0631586402b2490eec5c606eb"},
+    {file = "thermo-0.4.1.tar.gz", hash = "sha256:fdba77f0753eb52704000501d23b7f12a2860b7ff966b7c66acd0f7be9fa8859"},
+]
+
+[package.dependencies]
+chemicals = ">=1.3.2"
+fluids = ">=1.1.0"
+pandas = "*"
+scipy = ">=1.6.0"
+
+[package.extras]
+coverage-documentation = ["coverage (>=4.0.3)", "wsgiref (>=0.1.2)"]
 
 [[package]]
 name = "toml"
@@ -1919,7 +2043,7 @@ version = "2025.1"
 description = "Provider of IANA time zone data"
 optional = false
 python-versions = ">=2"
-groups = ["main"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "tzdata-2025.1-py2.py3-none-any.whl", hash = "sha256:7e127113816800496f027041c570f50bcd464a020098a3b6b199517772303639"},
@@ -1991,4 +2115,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9, <3.13"
-content-hash = "a7fecc79978a047ca0a1e3c9bf20dc0c92dd54879c54c7a729ae4c1bea055084"
+content-hash = "93e18e1a1af1654f1c74a6cc2e12ae974e7e877749c402e9575bb891b38b9300"

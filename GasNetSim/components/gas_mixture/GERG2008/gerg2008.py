@@ -305,9 +305,9 @@ class GasMixtureGERG2008:
 
         if use_numba:
             from .gerg2008_numba import (
-                PropertiesGERG_numba,
-                CalculateHeatingValue_numba,
+                PropertiesGERG_numba
             )
+            from ..functions.heating_values.heating_value import CalculateHeatingValue_numba
 
             properties = PropertiesGERG_numba(T=self.T, P=self.P, x=self.x)
             self.MolarMass = properties[0]
@@ -425,65 +425,13 @@ class GasMixtureGERG2008:
                 comp=composition, hhv=False, parameter="mass"
             )
 
-    def CalculateHeatingValue(self, comp, hhv, parameter):
-        # 298 K
-        # dict_enthalpy_mole = {'methane': -74602.416533355,
-        #                       'nitrogen': 0.0,
-        #                       'carbon dioxide': -393517.79827154,
-        #                       'ethane': -83856.2627150042,
-        #                       'propane': -103861.117481869,
-        #                       'isobutane': -135360.0,
-        #                       'n-butane': -125849.99999999999,
-        #                       'isopentane': -178400.0,
-        #                       'n-pentane': -173500.0,
-        #                       'n-hexane': -198490.0,
-        #                       'n-heptane': -223910.0,
-        #                       'n-hctane': -249730.0,
-        #                       'n-nonane': -274700.0,
-        #                       'n-decane': -300900.0,
-        #                       'hydrogen': 0.0,
-        #                       'oxygen': -4.40676212751828,
-        #                       'carbon monoxide': -110525.0,
-        #                       'water': -241833.418361837,
-        #                       'hydrogen sulfide': -20600.0,
-        #                       'helium': 0.0,
-        #                       'argon': 0.0,
-        #                       'carbon': 0.0}
-        #                       # 'H': 218000.0,
-        #                       # 'O': 249190.0,
-        #                       # 'SO2': -296840.0}
-
-        # 273 K
-        enthalpy_mole = np.array(
-            [
-                -75483.51423273719,  # methane
-                0.0,  # nitrogen
-                -394431.82606764464,  # carbon dioxide
-                -83856.2627150042,  # ethane
-                -103861.117481869,  # propane
-                -135360.0,  # isobutane
-                -125849.99999999999,  # n-butane
-                -178400.0,  # isopentane
-                -173500.0,  # n-pentane
-                -198490.0,  # n-hexane
-                -223910.0,  # n-heptane
-                -249730.0,  # n-octane
-                -274700.0,  # n-nonane
-                -300900.0,  # n-decane
-                0.0,  # hydrogen
-                -4.40676212751828,  # oxygen
-                -111262.34509634285,  # carbon monoxide
-                -242671.7203547155,  # water
-                -20600.0,  # hydrogen sulfide
-                0.0,  # helium
-                0.0,  # argon
-                -296840.0,
-            ]
-        )  # sulfur dioxide
-
+    def CalculateHeatingValue(self, comp, hhv, parameter, ref_temp=25.0):
+        from ..functions.heating_values.heating_value import load_enthalpy_values
         atom_list = number_of_atoms * comp[:, np.newaxis]
         reactants_atom = np.sum(atom_list, axis=0)
 
+        _enthalpy_values = load_enthalpy_values()
+        enthalpy_mole = _enthalpy_values[ref_temp]
         # products
         n_CO2 = reactants_atom[1]  # C
         n_SO2 = reactants_atom[6]  # S
@@ -500,13 +448,13 @@ class GasMixtureGERG2008:
         # reactants_dict.update({'oxygen': n_O2})
 
         # LHV calculation
-        LHV = (reactants_dict * enthalpy_mole[:-1]).sum() - (
+        LHV = (reactants_dict * enthalpy_mole[:-2]).sum() - (
             products_dict * enthalpy_mole[[2, 21, 17]]
         ).sum()
 
         # 298.15 K
-        hw_liq = -285839.09854950657
-        hw_gas = -241824.62162536496
+        hw_liq = enthalpy_mole[22]
+        hw_gas = enthalpy_mole[17]
 
         # 273 K
         # hw_liq = -287654.96084928664
