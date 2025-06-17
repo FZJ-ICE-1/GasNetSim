@@ -268,20 +268,50 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
 
 
 def create_incidence_matrix(nodes, connections):
-    branch_flow_matrix = create_branch_flow_matrix(nodes, connections)
+    """Legacy function for backward compatibility."""
+    branch_flow_matrix = create_branch_flow_matrix_legacy(nodes, connections)
     incidence_matrix = math.copysign(1, branch_flow_matrix)
 
     return incidence_matrix
 
 
-def create_branch_flow_matrix(nodes, connections, use_cuda=False):
-    n_nodes = len(nodes)
+def create_branch_flow_matrix(network, use_cuda=False):
+    """
+    Create branch flow matrix using network object.
+    
+    Args:
+        network: Network object containing nodes and connections
+        use_cuda: Whether to use CUDA
+    """
+    nodes = network.nodes
+    connections = network.connections
+    n_nodes = network.get_simulation_node_count()
     n_edges = len(connections)
-
+    
     _branch_flow_matrix = np.zeros((n_edges, n_nodes))
     for _i, _connection in connections.items():
-        _branch_flow_matrix[_i][_connection.inlet_index - 1] = -_connection.flow_rate
-        _branch_flow_matrix[_i][_connection.outlet_index - 1] = _connection.flow_rate
+        inlet_sim_idx = network.node_id_to_simulation_node_index(_connection.inlet_index)
+        outlet_sim_idx = network.node_id_to_simulation_node_index(_connection.outlet_index)
+        _branch_flow_matrix[_i][inlet_sim_idx] = -_connection.flow_rate
+        _branch_flow_matrix[_i][outlet_sim_idx] = _connection.flow_rate
+        
+    return _branch_flow_matrix
+
+
+def create_branch_flow_matrix_legacy(nodes, connections, use_cuda=False):
+    """
+    Legacy version for backward compatibility.
+    """
+    n_nodes = len(nodes)
+    n_edges = len(connections)
+    
+    _branch_flow_matrix = np.zeros((n_edges, n_nodes))
+    for _i, _connection in connections.items():
+        inlet_dense_idx = _connection.inlet_index - 1
+        outlet_dense_idx = _connection.outlet_index - 1
+        _branch_flow_matrix[_i][inlet_dense_idx] = -_connection.flow_rate
+        _branch_flow_matrix[_i][outlet_dense_idx] = _connection.flow_rate
+        
     return _branch_flow_matrix
 
 
@@ -352,13 +382,20 @@ def topological_sort_of_edges(graph: nx.MultiDiGraph, edge_index: dict):
     return edge_indices_order
 
 
-def create_nodal_composition_matrix(nodes, connections, use_cuda=False):
-    _branch_flow_matrix = create_branch_flow_matrix(nodes, connections)
+def create_nodal_composition_matrix(network, use_cuda=False):
+    """
+    Create nodal composition matrix using network object.
+    
+    Args:
+        network: Network object containing nodes and connections
+        use_cuda: Whether to use CUDA
+    """
+    _branch_flow_matrix = create_branch_flow_matrix(network, use_cuda=use_cuda)
 
     _nodal_inflow_matrix = np.where(_branch_flow_matrix > 0, _branch_flow_matrix, 0)
 
     _branch_outflow_composition = np.array(
-        [c.outflow_composition for c in connections.values()]
+        [c.outflow_composition for c in network.connections.values()]
     )
     _nodal_inflow_composition = np.dot(
         _nodal_inflow_matrix.T, _branch_outflow_composition
@@ -392,6 +429,7 @@ def calculate_nodal_inflow_states(
         tracking_method="simple_mixing",
         use_cuda=False,
         time_step=3600,
+        network=None,
 ):
     to_update = True
     _prev_nodal_composition_matrix = np.zeros((21, (len(nodes))))
@@ -429,10 +467,10 @@ def calculate_nodal_inflow_states(
                 if pipelines[pipeline.pipeline_index].outflow_composition is None:
                     raise ValueError("Check the topological order!")
 
-        _nodal_composition_matrix = create_nodal_composition_matrix(nodes, connections)
+        _nodal_composition_matrix = create_nodal_composition_matrix(network)
 
         nodes = update_temporary_nodal_gas_mixture_properties(
-            nodes, _nodal_composition_matrix
+            network, _nodal_composition_matrix
         )
         if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
             to_update = False
@@ -444,21 +482,21 @@ def calculate_nodal_inflow_states(
     return _nodal_composition_matrix, pipelines, nodes
 
 
-def update_temporary_nodal_gas_mixture_properties(nodes, nodal_composition_matrix):
+def update_temporary_nodal_gas_mixture_properties(network, nodal_composition_matrix):
     """
-
-    :param nodes:
-    :param nodal_composition_matrix:
-    :return:
+    Update temporary nodal gas mixture properties using network object.
+    
+    Args:
+        network: Network object containing nodes and index mapping
+        nodal_composition_matrix: Matrix of nodal compositions
     """
+    nodes = network.nodes
     for _i in range(nodal_composition_matrix.shape[1]):  # iterate over nodes
         if np.any(np.isnan(nodal_composition_matrix[:, _i])):  # No inflow
             pass
         else:
-            nodes[_i + 1].gas_mixture.eos_composition_tmp = nodal_composition_matrix[
-                                                            :, _i
-                                                            ]
-            # nodes[_i+1].gas_mixture.update_gas_mixture()
+            node_id = network.simulation_node_index_to_node_id(_i)
+            nodes[node_id].gas_mixture.eos_composition_tmp = nodal_composition_matrix[:, _i]
     return nodes
 
 

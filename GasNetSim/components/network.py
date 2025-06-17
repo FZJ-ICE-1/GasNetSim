@@ -65,7 +65,12 @@ class Network:
         self.resistances = resistances
         self.linear_resistances = linear_resistances
         self.shortpipes = shortpipes
+        
+        # Create index mapping for all components
+        self._create_index_mappings()
+        
         self.connections = self.all_edge_components()
+        self._create_connection_mappings()  # Create connection mappings after connections are built
         self.connection_matrix = self.create_connection_matrix()
         self.reference_nodes = self.find_reference_nodes()
         self.non_junction_nodes = self.find_non_junction_nodes()
@@ -78,6 +83,137 @@ class Network:
         else:
             self.base_composition = NATURAL_GAS_gri30
         # self.incidence_matrix = self.create_incidence_matrix()
+
+    def _create_index_mappings(self):
+        """
+        Create index mappings between domain IDs and simulation indices for all components.
+        
+        Domain IDs: Original indices from CSV/user input (can be sparse like 1,5,10,15)
+        Simulation indices: Sequential indices used in matrices/vectors (always 0,1,2,3)
+        """
+        # Node mapping: domain IDs → simulation node indices
+        if not self.nodes:
+            # Handle empty nodes case
+            self._node_id_to_simulation_node_index = {}
+            self._simulation_node_index_to_node_id = {}
+            self._max_node_id = 0
+            return
+            
+        sorted_node_ids = sorted(self.nodes.keys())
+        self._node_id_to_simulation_node_index = {node_id: sim_idx for sim_idx, node_id in enumerate(sorted_node_ids)}
+        self._simulation_node_index_to_node_id = {sim_idx: node_id for sim_idx, node_id in enumerate(sorted_node_ids)}
+        self._max_node_id = max(self.nodes.keys())
+        
+        # Connection mapping will be created after connections are built
+        self._connection_mappings_created = False
+        
+    def node_id_to_simulation_node_index(self, node_id):
+        """
+        Convert domain node ID to simulation node index for vectors/matrices.
+        
+        Args:
+            node_id: Original node ID from CSV/user (e.g., 5, 10, 15)
+        Returns:
+            simulation_node_index: Sequential index for node vectors (e.g., 0, 1, 2)
+        """
+        if node_id not in self._node_id_to_simulation_node_index:
+            raise ValueError(f"Node ID {node_id} not found in network")
+        return self._node_id_to_simulation_node_index[node_id]
+        
+    def simulation_node_index_to_node_id(self, simulation_node_index):
+        """
+        Convert simulation node index to domain node ID.
+        
+        Args:
+            simulation_node_index: Sequential index for node vectors (e.g., 0, 1, 2)
+        Returns:
+            node_id: Original node ID from CSV/user (e.g., 5, 10, 15)
+        """
+        if simulation_node_index not in self._simulation_node_index_to_node_id:
+            raise ValueError(f"Simulation node index {simulation_node_index} not found in mapping")
+        return self._simulation_node_index_to_node_id[simulation_node_index]
+        
+    def get_simulation_node_count(self):
+        """
+        Get the number of nodes for matrix/vector dimensions.
+        """
+        return len(self.nodes)
+    
+    def _create_connection_mappings(self):
+        """
+        Create index mappings for connections after all edge components are combined.
+        
+        This maps:
+        - Pipeline domain IDs (e.g., 1, 5, 10) → simulation edge indices (0, 1, 2, ...)
+        - Resistance domain IDs (e.g., 2, 7) → simulation edge indices (3, 4, ...)
+        - etc.
+        """
+        if not hasattr(self, 'connections') or self.connections is None:
+            return
+            
+        # Build mappings for each component type
+        self._pipeline_id_to_simulation_edge_index = {}
+        self._resistance_id_to_simulation_edge_index = {}
+        self._compressor_id_to_simulation_edge_index = {}
+        self._linear_resistance_id_to_simulation_edge_index = {}
+        self._shortpipe_id_to_simulation_edge_index = {}
+        
+        # Reverse mappings
+        self._simulation_edge_index_to_component_info = {}  # sim_idx → (component_type, domain_id)
+        
+        for sim_edge_idx, connection in self.connections.items():
+            component_type = type(connection).__name__
+            
+            if hasattr(connection, 'pipeline_index'):
+                domain_id = connection.pipeline_index
+                self._pipeline_id_to_simulation_edge_index[domain_id] = sim_edge_idx
+                self._simulation_edge_index_to_component_info[sim_edge_idx] = ('Pipeline', domain_id)
+            elif hasattr(connection, 'inlet_index') and component_type == 'Resistance':
+                # Resistance doesn't have its own index, use a tuple of inlet/outlet
+                domain_id = (connection.inlet_index, connection.outlet_index)
+                self._resistance_id_to_simulation_edge_index[domain_id] = sim_edge_idx
+                self._simulation_edge_index_to_component_info[sim_edge_idx] = ('Resistance', domain_id)
+            # Add other component types as needed...
+            
+        self._connection_mappings_created = True
+    
+    def pipeline_id_to_simulation_edge_index(self, pipeline_id):
+        """
+        Convert pipeline domain ID to simulation edge index.
+        
+        Args:
+            pipeline_id: Original pipeline ID from CSV/user (e.g., 5, 10, 15)
+        Returns:
+            simulation_edge_index: Sequential index for edge matrices (e.g., 0, 1, 2)
+        """
+        if not self._connection_mappings_created:
+            self._create_connection_mappings()
+        
+        if pipeline_id not in self._pipeline_id_to_simulation_edge_index:
+            raise ValueError(f"Pipeline ID {pipeline_id} not found in network")
+        return self._pipeline_id_to_simulation_edge_index[pipeline_id]
+    
+    def simulation_edge_index_to_component_info(self, simulation_edge_index):
+        """
+        Convert simulation edge index to component information.
+        
+        Args:
+            simulation_edge_index: Sequential index for edge matrices (e.g., 0, 1, 2)
+        Returns:
+            tuple: (component_type, domain_id) e.g., ('Pipeline', 5)
+        """
+        if not self._connection_mappings_created:
+            self._create_connection_mappings()
+            
+        if simulation_edge_index not in self._simulation_edge_index_to_component_info:
+            raise ValueError(f"Simulation edge index {simulation_edge_index} not found in mapping")
+        return self._simulation_edge_index_to_component_info[simulation_edge_index]
+    
+    def get_simulation_edge_count(self):
+        """
+        Get the number of connections for matrix/vector dimensions.
+        """
+        return len(self.connections) if hasattr(self, 'connections') and self.connections else 0
 
     def all_edge_components(self):
         connections = dict()
@@ -103,25 +239,20 @@ class Network:
     def create_incidence_matrix(self):
         connections = self.all_edge_components()
 
-        node_ids = {
-            node_id - 1
-            for c in connections.values()
-            for node_id in [c.inlet_index, c.outlet_index]
-        }
-
         row_indices = []
         col_indices = []
         data_values = []
 
         for branch_id, branch_data in connections.items():
-            row_indices.extend(
-                [branch_data.inlet_index - 1, branch_data.outlet_index - 1]
-            )  # node indices start from 1
+            inlet_dense_idx = self.node_id_to_simulation_node_index(branch_data.inlet_index)
+            outlet_dense_idx = self.node_id_to_simulation_node_index(branch_data.outlet_index)
+            
+            row_indices.extend([inlet_dense_idx, outlet_dense_idx])
             col_indices.extend([branch_id, branch_id])  # branch_id starts from 0
             data_values.extend([1, -1])
 
         # Determine the shape of the incidence matrix
-        num_nodes = len(node_ids)
+        num_nodes = self.get_simulation_node_count()
         num_branches = len(connections)
         shape = (num_nodes, num_branches)
 
@@ -143,13 +274,13 @@ class Network:
         return None
 
     def mapping_of_connections(self, use_cuda=False, sparse_matrix=False):
-        n_nodes = len(self.nodes.values())
+        n_nodes = self.get_simulation_node_count()
         mapping = create_matrix_of_zeros(
             n_nodes, use_cuda=use_cuda, sparse_matrix=sparse_matrix
         )
         for i_connection, connection in self.connections.items():
-            i = connection.inlet_index - 1
-            j = connection.outlet_index - 1
+            i = self.node_id_to_simulation_node_index(connection.inlet_index)
+            j = self.node_id_to_simulation_node_index(connection.outlet_index)
             mapping[i][j] = mapping[j][i] = i_connection
         return mapping
 
@@ -229,8 +360,7 @@ class Network:
     #     return None
 
     def create_connection_matrix(self, use_cuda=False, sparse_matrix=False):
-        # TODO change the index number
-        n_nodes = len(self.nodes.values())
+        n_nodes = self.get_simulation_node_count()
         pipelines = self.pipelines
         compressors = self.compressors
         resistances = self.resistances
@@ -247,8 +377,8 @@ class Network:
 
         if pipelines is not None:
             for pipe in pipelines.values():
-                i = pipe.inlet_index - 1
-                j = pipe.outlet_index - 1
+                i = self.node_id_to_simulation_node_index(pipe.inlet_index)
+                j = self.node_id_to_simulation_node_index(pipe.outlet_index)
                 if sparse_matrix:
                     row_ind.append(i)
                     col_ind.append(j)
@@ -259,8 +389,8 @@ class Network:
 
         if compressors is not None:
             for compressor in compressors.values():
-                i = compressor.inlet_index - 1
-                j = compressor.outlet_index - 1
+                i = self.node_id_to_simulation_node_index(compressor.inlet_index)
+                j = self.node_id_to_simulation_node_index(compressor.outlet_index)
                 if sparse_matrix:
                     row_ind.append(i)
                     col_ind.append(j)
@@ -271,8 +401,8 @@ class Network:
 
         if resistances is not None:
             for resistance in resistances.values():
-                i = resistance.inlet_index - 1
-                j = resistance.outlet_index - 1
+                i = self.node_id_to_simulation_node_index(resistance.inlet_index)
+                j = self.node_id_to_simulation_node_index(resistance.outlet_index)
                 if sparse_matrix:
                     row_ind.append(i)
                     col_ind.append(j)
@@ -283,8 +413,8 @@ class Network:
 
         if shortpipes is not None:
             for sp in shortpipes.values():
-                i = sp.inlet_index - 1
-                j = sp.outlet_index - 1
+                i = self.node_id_to_simulation_node_index(sp.inlet_index)
+                j = self.node_id_to_simulation_node_index(sp.outlet_index)
                 if sparse_matrix:
                     row_ind.append(i)
                     col_ind.append(j)
@@ -342,7 +472,7 @@ class Network:
 
         max_resistance = max([x[2] for x in resistance])
         max_flow = max(
-            [x.volumetric_flow for x in nodes.values() if x.volumetric_flow is not None]
+            [abs(x.volumetric_flow) for x in nodes.values() if x.volumetric_flow is not None]
         )
         pressure_init = [node.pressure for node in nodes.values()]
         # pipeline_with_missing_pressure = copy.deepcopy(pipelines)
@@ -352,8 +482,10 @@ class Network:
             pressure_init_old = copy.deepcopy(pressure_init)
             # pipeline_initialized = list()
             for r in resistance:
-                i = r[0] - 1  # inlet index
-                j = r[1] - 1  # outlet index
+                inlet_node_id = r[0]  # inlet node ID (domain)
+                outlet_node_id = r[1]  # outlet node ID (domain)
+                i = self.node_id_to_simulation_node_index(inlet_node_id)  # simulation index
+                j = self.node_id_to_simulation_node_index(outlet_node_id)  # simulation index
                 res = r[2]  # resistance
                 flow = r[3]
                 if pressure_init[i] is None and pressure_init[j] is None:
@@ -435,7 +567,8 @@ class Network:
         total_flow = sum([x for x in nodal_flow_init if x is not None])
 
         for n in p_ref_nodes:
-            nodal_flow_init[n - 1] = -total_flow / len(p_ref_nodes)
+            sim_node_idx = self.node_id_to_simulation_node_index(n)
+            nodal_flow_init[sim_node_idx] = -total_flow / len(p_ref_nodes)
 
         if self.run_initialization:
             pressure_init = self.pressure_initialization()
@@ -443,14 +576,14 @@ class Network:
             pressure_init = self.pressure_prev
 
         for i in range(len(nodal_flow_init)):
-            # TODO change to number of non-reference nodes
-            nodes[i + 1].pressure = pressure_init[i]
-            nodes[i + 1].volumetric_flow = nodal_flow_init[i]
-            nodes[i + 1].temperature = temperature_init[i]
-            if nodes[i + 1].flow_type == "volumetric":
-                nodes[i + 1].convert_volumetric_to_energy_flow()
-            elif nodes[i + 1].flow_type == "energy":
-                nodes[i + 1].convert_energy_to_volumetric_flow()
+            node_id = self.simulation_node_index_to_node_id(i)
+            nodes[node_id].pressure = pressure_init[i]
+            nodes[node_id].volumetric_flow = nodal_flow_init[i]
+            nodes[node_id].temperature = temperature_init[i]
+            if nodes[node_id].flow_type == "volumetric":
+                nodes[node_id].convert_volumetric_to_energy_flow()
+            elif nodes[node_id].flow_type == "energy":
+                nodes[node_id].convert_energy_to_volumetric_flow()
             else:
                 raise (
                     ValueError("Unknown flow type, can be only volumetric or energy!")
@@ -473,9 +606,9 @@ class Network:
         connections = self.connections
         nodes = self.nodes
 
-        non_junction_nodes = [x - 1 for x in self.non_junction_nodes]
+        non_junction_nodes_sim_indices = [self.node_id_to_simulation_node_index(x) for x in self.non_junction_nodes]
 
-        n_nodes = len(nodes)
+        n_nodes = self.get_simulation_node_count()
 
         n_junction_nodes = len(self.junction_nodes)
 
@@ -487,8 +620,8 @@ class Network:
         )
 
         for connection in connections.values():
-            i = connection.inlet_index - 1
-            j = connection.outlet_index - 1
+            i = self.node_id_to_simulation_node_index(connection.inlet_index)
+            j = self.node_id_to_simulation_node_index(connection.outlet_index)
 
             connection.calculate_stable_flow_rate()
 
@@ -501,24 +634,24 @@ class Network:
                 p2 = connection.outlet.pressure
                 tmp = (abs(p1**2 - p2**2 - slope_corr)) ** (-0.5)
 
-                if i not in non_junction_nodes and j not in non_junction_nodes:
+                if i not in non_junction_nodes_sim_indices and j not in non_junction_nodes_sim_indices:
                     jacobian_mat[i][j] += connection.flow_rate_first_order_derivative(
                         is_inlet=False
                     )
                     jacobian_mat[j][i] += connection.flow_rate_first_order_derivative(
                         is_inlet=True
                     )
-                if i not in non_junction_nodes:
+                if i not in non_junction_nodes_sim_indices:
                     jacobian_mat[i][i] += -connection.flow_rate_first_order_derivative(
                         is_inlet=True
                     )
-                if j not in non_junction_nodes:
+                if j not in non_junction_nodes_sim_indices:
                     jacobian_mat[j][j] += -connection.flow_rate_first_order_derivative(
                         is_inlet=False
                     )
 
-        jacobian_mat = delete_matrix_rows_and_columns(jacobian_mat, non_junction_nodes)
-        # flow_mat = delete_matrix_rows_and_columns(flow_mat, non_junction_nodes)
+        jacobian_mat = delete_matrix_rows_and_columns(jacobian_mat, non_junction_nodes_sim_indices)
+        # flow_mat = delete_matrix_rows_and_columns(flow_mat, non_junction_nodes_dense)
 
         return jacobian_mat, flow_mat
 
@@ -561,18 +694,18 @@ class Network:
 
     def update_node_parameters(self, pressure, flow, temperature):
         for i in range(len(flow)):
-            # TODO change to number of non-reference nodes
-            self.nodes[i + 1].pressure = pressure[i]
-            self.nodes[i + 1].volumetric_flow = flow[i]
-            self.nodes[i + 1].gas_mixture.pressure = self.nodes[i + 1].pressure
-            self.nodes[i + 1].gas_mixture.temperature = self.nodes[i + 1].temperature
-            self.nodes[i + 1].gas_mixture.update_gas_mixture()
-            # self.nodes[i + 1].update_gas_mixture()
+            node_id = self.simulation_node_index_to_node_id(i)
+            self.nodes[node_id].pressure = pressure[i]
+            self.nodes[node_id].volumetric_flow = flow[i]
+            self.nodes[node_id].gas_mixture.pressure = self.nodes[node_id].pressure
+            self.nodes[node_id].gas_mixture.temperature = self.nodes[node_id].temperature
+            self.nodes[node_id].gas_mixture.update_gas_mixture()
+            # self.nodes[node_id].update_gas_mixture()
 
-            if self.nodes[i + 1].flow_type == "volumetric":
-                self.nodes[i + 1].convert_volumetric_to_energy_flow()
-            elif self.nodes[i + 1].flow_type == "energy":
-                self.nodes[i + 1].convert_energy_to_volumetric_flow()
+            if self.nodes[node_id].flow_type == "volumetric":
+                self.nodes[node_id].convert_volumetric_to_energy_flow()
+            elif self.nodes[node_id].flow_type == "energy":
+                self.nodes[node_id].convert_energy_to_volumetric_flow()
             else:
                 raise (
                     ValueError("Unknown flow type, can be only volumetric or energy!")
@@ -636,7 +769,7 @@ class Network:
         flow_vector = calculate_flow_vector(
             network=self, pressure_bar=p, target_flow=f_target
         )
-        print(sorted([abs(x) for x in flow_vector])[-10:])
+        # print(sorted([abs(x) for x in flow_vector])[-10:])
 
         return flow_vector
 
@@ -700,9 +833,9 @@ class Network:
         # logging.info(f"Initial pressure: {p}")
         # logging.info(f"Initial flow: {f_target}")
 
-        reference_nodes = [
-            x - 1 for x in self.reference_nodes
-        ]  # indices of reference nodes
+        reference_nodes_sim_indices = [
+            self.node_id_to_simulation_node_index(x) for x in self.reference_nodes
+        ]  # simulation indices of reference nodes
         self.update_node_parameters(pressure=p, flow=f_target, temperature=t)
         if self.pipelines is not None:
             self.update_pipeline_parameters()
@@ -747,6 +880,7 @@ class Network:
                 self.connections,
                 mapping_connections,
                 tracking_method=tracking_method,
+                network=self,
             )
 
             # inflow_xi, inflow_temp = calculate_nodal_inflow_states(self.nodes, self.connections,
@@ -754,7 +888,7 @@ class Network:
             # nodal_gas_inflow_composition = inflow_xi
             # nodal_gas_inflow_temperature = inflow_temp
             update_temporary_nodal_gas_mixture_properties(
-                self.nodes, nodal_gas_inflow_composition
+                self, nodal_gas_inflow_composition
             )
 
             if use_cuda:
@@ -804,20 +938,22 @@ class Network:
             )
             logging.debug(delta_p)
 
-            # Add 0 to the delta_p vector for referece nodes
+            # Add 0 to the delta_p vector for reference nodes
             for i in self.non_junction_nodes:
+                sim_idx = self.node_id_to_simulation_node_index(i)
                 if use_cuda:
                     delta_p = cp.concatenate(
-                        (delta_p[: i - 1], cp.array([0]), delta_p[i - 1 :])
+                        (delta_p[:sim_idx], cp.array([0]), delta_p[sim_idx:])
                     )
                 else:
-                    delta_p = np.insert(delta_p, i - 1, 0)  # TODO check this
+                    delta_p = np.insert(delta_p, sim_idx, 0)
 
             p += delta_p  # update nodal pressure list
 
             for i in self.nodes.keys():
                 if i not in self.reference_nodes:
-                    self.nodes[i].pressure = p[i - 1]  # update nodal pressure
+                    sim_idx = self.node_id_to_simulation_node_index(i)
+                    self.nodes[i].pressure = p[sim_idx]  # update nodal pressure
 
             for i_connection, connection in self.connections.items():
                 connection.inlet = self.nodes[connection.inlet_index]
@@ -873,7 +1009,8 @@ class Network:
         # pipe_h2_fraction = list()
 
         for i_node in self.non_junction_nodes:
-            self.nodes[i_node].volumetric_flow = nodal_flow[i_node - 1]
+            sim_idx = self.node_id_to_simulation_node_index(i_node)
+            self.nodes[i_node].volumetric_flow = nodal_flow[sim_idx]
             if self.nodes[i_node].flow_type == "volumetric":
                 self.nodes[i_node].convert_volumetric_to_energy_flow()
             elif self.nodes[i_node].flow_type == "energy":
