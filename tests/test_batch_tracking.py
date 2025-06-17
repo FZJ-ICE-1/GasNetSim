@@ -14,10 +14,10 @@ from GasNetSim.components import Node, Pipeline
 from GasNetSim.components.utils.utils import batch_tracking, clean_boundary_batches
 
 
-class TestPipeline:
+class MockPipeline:
     def __init__(self, length):
         """
-        Initializes a test pipeline for batch tracking simulations.
+        Initializes a mock pipeline for batch tracking simulations.
 
         :param length: Length of the pipeline [m].
         """
@@ -35,7 +35,7 @@ class TestBatchTracking(unittest.TestCase):
         self.length = 4.5  # Pipeline length in meters
         self.inlet_composition = np.array([0] * 21)
         self.outlet_composition = np.array([1] * 21)
-        self.connection = TestPipeline(self.length)
+        self.connection = MockPipeline(self.length)
 
     def test_zero_velocity(self):
         self.connection.batch_location_history = [1, 2]
