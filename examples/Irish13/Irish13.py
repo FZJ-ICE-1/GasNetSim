@@ -17,7 +17,7 @@ from timeit import default_timer as timer
 import GasNetSim as gns
 from GasNetSim.components.utils.plot_functions import plot_network_pipeline_flow_results
 
-network = gns.create_network_from_csv(Path("."))
+network = gns.create_network_from_folder(Path("."))
 
 # start = timer()
 # network.simulation(use_cuda=True, tol=0.0001)
