@@ -56,6 +56,8 @@ def hagen_poiseuille(N_re):
     :param N_re: Reynolds number (dimensionless)
     :return: Friction factor (dimensionless)
     """
+    if N_re == 0:
+        return np.inf
     return 64 / N_re
 
 

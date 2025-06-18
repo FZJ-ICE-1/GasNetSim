@@ -176,7 +176,7 @@ def run_time_series(
         sep=";",
         profile_type="energy",
         tolerance=0.01,
-        max_iter=20,
+        max_iter=100,
         time_step=3600,  # 1 hour
         tracking_method="simple_mixing",
         save_to_file=True,
@@ -229,19 +229,17 @@ def run_time_series(
             if i in full_network.reference_nodes:
                 full_network.nodes[i].volumetric_flow = None
                 full_network.nodes[i].energy_flow = None
-            else:
-                try:
-                    if profile_type == "volumetric":
-                        full_network.nodes[i].volumetric_flow = profiles[i][t]
-                        full_network.nodes[i].convert_volumetric_to_energy_flow()
-                    elif profile_type == "energy":
-                        full_network.nodes[i].energy_flow = profiles[i][t]
-                        full_network.nodes[i].convert_energy_to_volumetric_flow()
-                    else:
-                        raise ValueError(f"Unknown profile type {profile_type}!")
-                    # full_network.nodes[i].demand_type = 'energy'
-                except KeyError:
-                    print(f"Node index {i} is not found!")
+            elif i in profiles.columns:  # Only apply profiles to nodes that have profile data
+                if profile_type == "volumetric":
+                    full_network.nodes[i].volumetric_flow = profiles.loc[t][i]
+                    full_network.nodes[i].convert_volumetric_to_energy_flow()
+                elif profile_type == "energy":
+                    full_network.nodes[i].energy_flow = profiles.loc[t][i]
+                    full_network.nodes[i].convert_energy_to_volumetric_flow()
+                else:
+                    raise ValueError(f"Unknown profile type {profile_type}!")
+                # full_network.nodes[i].demand_type = 'energy'
+            # If node is not a reference node and has no profile data, keep existing flow values
         # simplified_network = update_network_topology(full_network)
         simplified_network = full_network
         try:
@@ -263,7 +261,7 @@ def run_time_series(
         except (RuntimeError, TypeError) as e:
             # error_log.append([simplified_network, profiles.iloc[t]])
             print(e)
-            error_log.append([e, full_network, profiles.iloc[t]])
+            error_log.append([e, full_network, profiles.loc[t]])
 
         results = save_time_series_results(full_network, results, results_to_save)
     # Save simulation results to file

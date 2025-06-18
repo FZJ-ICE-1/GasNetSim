@@ -12,7 +12,7 @@ import pandas as pd
 
 import GasNetSim as gns
 
-network = gns.create_network_from_csv(Path("../Irish13/"))
+network = gns.create_network_from_folder(Path("../Irish13/"))
 network_resistance = pd.DataFrame(
     columns=["resistance_index", "inlet_index", "outlet_index", "resistance"]
 )
