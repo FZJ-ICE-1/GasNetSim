@@ -22,6 +22,7 @@ from collections import OrderedDict
 from .utils.utils import *
 from .node import *
 from .pipeline import *
+from .compressor import *
 from .utils import *
 
 # try:
@@ -292,7 +293,8 @@ class Network:
         pressure_ref_nodes = list()
 
         for node in self.nodes.values():
-            if node.pressure is not None:
+            # Check for reference node type, not just pressure presence
+            if node.node_type == "reference" and node.pressure is not None:
                 pressure_ref_nodes.append(node.index)
 
         return pressure_ref_nodes
@@ -629,26 +631,38 @@ class Network:
             flow_mat[j][i] += connection.flow_rate
 
             if type(connection) is not ShortPipe:
-                slope_corr = connection.calc_pipe_slope_correction()
-                p1 = connection.inlet.pressure
-                p2 = connection.outlet.pressure
-                tmp = (abs(p1**2 - p2**2 - slope_corr)) ** (-0.5)
+                if type(connection) is Compressor:
+                    # Use the proper derivatives from compressor class
+                    total_flow_in, total_derivative_in, total_flow_out, total_derivative_out = connection.calculate_incoming_flows_and_derivatives(
+                        self.pipelines.values()
+                    )
+        
+                    jacobian_mat[i][i] += total_derivative_in
+                    jacobian_mat[j][j] += total_derivative_out
+                    jacobian_mat[i][j] -= total_derivative_in
+                    jacobian_mat[j][i] -= total_derivative_out
+                else:
+                    # Standard pipeline/resistance handling
+                    slope_corr = connection.calc_pipe_slope_correction()
+                    p1 = connection.inlet.pressure
+                    p2 = connection.outlet.pressure
+                    tmp = (abs(p1**2 - p2**2 - slope_corr)) ** (-0.5)
 
-                if i not in non_junction_nodes_sim_indices and j not in non_junction_nodes_sim_indices:
-                    jacobian_mat[i][j] += connection.flow_rate_first_order_derivative(
-                        is_inlet=False
-                    )
-                    jacobian_mat[j][i] += connection.flow_rate_first_order_derivative(
-                        is_inlet=True
-                    )
-                if i not in non_junction_nodes_sim_indices:
-                    jacobian_mat[i][i] += -connection.flow_rate_first_order_derivative(
-                        is_inlet=True
-                    )
-                if j not in non_junction_nodes_sim_indices:
-                    jacobian_mat[j][j] += -connection.flow_rate_first_order_derivative(
-                        is_inlet=False
-                    )
+                    if i not in non_junction_nodes_sim_indices and j not in non_junction_nodes_sim_indices:
+                        jacobian_mat[i][j] += connection.flow_rate_first_order_derivative(
+                            is_inlet=False
+                        )
+                        jacobian_mat[j][i] += connection.flow_rate_first_order_derivative(
+                            is_inlet=True
+                        )
+                    if i not in non_junction_nodes_sim_indices:
+                        jacobian_mat[i][i] += -connection.flow_rate_first_order_derivative(
+                            is_inlet=True
+                        )
+                    if j not in non_junction_nodes_sim_indices:
+                        jacobian_mat[j][j] += -connection.flow_rate_first_order_derivative(
+                            is_inlet=False
+                        )
 
         jacobian_mat = delete_matrix_rows_and_columns(jacobian_mat, non_junction_nodes_sim_indices)
         # flow_mat = delete_matrix_rows_and_columns(flow_mat, non_junction_nodes_dense)
@@ -750,6 +764,28 @@ class Network:
             r.outlet = self.nodes[r.outlet_index]
             r.update_gas_mixture()
 
+    def update_compressor_parameters(self):
+        """Update compressor parameters and calculate flow rates."""
+        if self.compressors is not None:
+            for index, compressor in self.compressors.items():
+                compressor.inlet = self.nodes[compressor.inlet_index]
+                compressor.outlet = self.nodes[compressor.outlet_index]
+                compressor.update_gas_mixture()
+                
+                # Calculate compressor flow rates from connected pipelines
+                if self.pipelines is not None:
+                    total_flow_in, total_derivative_in, total_flow_out, total_derivative_out = \
+                        compressor.calculate_incoming_flows_and_derivatives(self.pipelines.values())
+                    
+                    # Fix sign convention: node demands should be positive for consumption
+                    inlet_node_demand = compressor.inlet.volumetric_flow if compressor.inlet.volumetric_flow is not None else 0.0
+                    outlet_node_demand = compressor.outlet.volumetric_flow if compressor.outlet.volumetric_flow is not None else 0.0
+                    
+                    compressor.update_flow_rate(total_flow_in, total_flow_out, inlet_node_demand, outlet_node_demand)
+                    
+                    # Enforce compressor pressure constraint
+                    self.nodes[compressor.outlet_index].pressure = self.nodes[compressor.inlet_index].pressure * compressor.compression_ratio
+
     def update_connection_flow_rate(self):
         for connection in self.connections.values():
             connection.flow_rate = connection.calc_flow_rate()
@@ -841,6 +877,8 @@ class Network:
             self.update_pipeline_parameters()
         if self.resistances is not None:
             self.update_resistance_parameters()
+        if self.compressors is not None:
+            self.update_compressor_parameters()
 
         delta_flow = 0
 
@@ -982,6 +1020,8 @@ class Network:
                 self.update_pipeline_parameters()
             if self.resistances is not None:
                 self.update_resistance_parameters()
+            if self.compressors is not None:
+                self.update_compressor_parameters()
 
             # plt.figure()
             # plt.plot(delta_flow)

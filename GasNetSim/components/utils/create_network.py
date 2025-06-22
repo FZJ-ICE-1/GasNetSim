@@ -16,6 +16,7 @@ from scipy.constants import atm
 from ..network import Network
 from ..node import Node
 from ..pipeline import Pipeline, Resistance, ShortPipe, LinearResistance
+from ..compressor import Compressor
 from ..gas_mixture.typical_mixture_composition import COMMON_GAS_COMPOSITIONS
 from ...utils.exception import *
 
@@ -115,13 +116,51 @@ def read_pipelines(
     return pipelines
 
 
-def read_compressors(path_to_file: Path) -> dict:
+def read_compressors(path_to_file: Path, network_nodes: dict) -> dict:
     """
+    Read compressors from a CSV file and create Compressor objects.
 
-    :param path_to_file:
-    :return:
+    :param path_to_file: Path to the CSV file containing compressor information.
+    :param network_nodes: Dictionary of existing network nodes.
+    :return: A dictionary of compressor indices to Compressor objects.
     """
     compressors = dict()
+    
+    try:
+        df_compressors = pd.read_csv(path_to_file, delimiter=";")
+        df_compressors = df_compressors.replace({np.nan: None})
+        
+        for index, row in df_compressors.iterrows():
+            compressor_index = int(row["compressor_index"])
+            inlet_index = int(row["inlet"])
+            outlet_index = int(row["outlet"])
+            compression_ratio = float(row["compression_ratio"]) if row["compression_ratio"] is not None else 1.1
+            efficiency = float(row["efficiency"]) if row["efficiency"] is not None else 0.85
+            thermodynamic_process = row["thermodynamic_process"] if row["thermodynamic_process"] is not None else "isentropic"
+            drive = row["drive"] if "drive" in row and row["drive"] is not None else "electric"
+            
+            # Get inlet and outlet nodes
+            inlet_node = network_nodes[inlet_index]
+            outlet_node = network_nodes[outlet_index]
+            
+            # Create compressor object
+            compressor = Compressor(
+                compressor_index=compressor_index,
+                inlet=inlet_node,
+                outlet=outlet_node,
+                compression_ratio=compression_ratio,
+                efficiency=efficiency,
+                thermodynamic_process=thermodynamic_process,
+                drive=drive
+            )
+            
+            compressors[compressor_index] = compressor
+            
+    except FileNotFoundError:
+        print(f"Compressor file not found: {path_to_file}")
+    except Exception as e:
+        print(f"Error reading compressors: {e}")
+        
     return compressors
 
 
