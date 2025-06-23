@@ -20,6 +20,7 @@ variables:
 cache:
   paths:
     - .cache/pip
+    - .cache/pre-commit
     - venv/
 
 stages:
@@ -33,13 +34,18 @@ pre-commit:
   image: python:3.12
   before_script:
     - python -m pip install --upgrade pip
-    - pip install poetry poetry-plugin-export pre-commit
+    - curl -sSL https://install.python-poetry.org | python3 -
     - export PATH="$HOME/.local/bin:$PATH"
-    - poetry --version    # Verify Poetry installation
-    - poetry env use python3.12  # ensures consistent export
-    - pip install pre-commit  # Install pre-commit if needed
+    - poetry --version
+    - pip install pre-commit poetry-plugin-export
+    - export PATH="$HOME/.local/bin:$PATH"
+    - echo "PATH is $PATH"
+    - which poetry
+    - poetry --version
+    - poetry env use python3.12
   script:
-    - pre-commit run --all-files  # Run pre-commit hooks
+    - export PATH="$HOME/.local/bin:$PATH"
+    - pre-commit run --all-files
   cache:
       paths:
         - .cache/pip
