@@ -67,7 +67,9 @@ def assign_pipeline_geometry(pipeline):
 def plot_network_pipeline_flow_results(network, backend="auto", shapefile_path=None, 
                                        basemap_provider=None, crs=4326, 
                                        cartopy_projection=None, figsize=(10, 8), 
-                                       pipeline_color="#FABE50", alpha=1.0, **kwargs):
+                                       pipeline_color="#FABE50", alpha=1.0, 
+                                       line_width_scale=1.0, min_line_width=0.5, 
+                                       margin_factor=0.2, **kwargs):
     """
     Plot network pipeline flow results with multiple backend options.
     
@@ -91,6 +93,12 @@ def plot_network_pipeline_flow_results(network, backend="auto", shapefile_path=N
         Color for pipeline lines
     alpha : float, default 1.0
         Transparency for pipeline lines
+    line_width_scale : float, default 1.0
+        Scaling factor for line widths based on flow rates
+    min_line_width : float, default 0.5
+        Minimum line width for pipelines
+    margin_factor : float, default 0.2
+        Margin as fraction of coordinate range (0.2 = 20% of range on each side)
     **kwargs
         Additional arguments passed to plotting functions
         
@@ -146,9 +154,9 @@ def plot_network_pipeline_flow_results(network, backend="auto", shapefile_path=N
         x, y = pipe.geometry.xy
         lines.append(np.column_stack((x, y)))
         colors.append((*matplotlib.colors.to_rgb(pipeline_color), alpha))
-        # Scale linewidth based on flow rate (with minimum width)
+        # Scale linewidth based on flow rate (with configurable scaling and minimum)
         flow_rate = pipe.flow_rate if pipe.flow_rate else 0
-        linewidth = max(abs(flow_rate) / 10, 0.5)  # Minimum linewidth of 0.5
+        linewidth = max(abs(flow_rate) * line_width_scale / 10, min_line_width)
         linewidths.append(linewidth)
     
     # Create figure based on backend
@@ -162,17 +170,18 @@ def plot_network_pipeline_flow_results(network, backend="auto", shapefile_path=N
         ax.add_feature(cfeature.OCEAN, color='lightblue', alpha=0.3)
         ax.add_feature(cfeature.LAND, color='lightgray', alpha=0.3)
         
-        # Set extent based on pipeline coordinates
+        # Set extent based on pipeline coordinates with configurable margin
         all_coords = np.concatenate([line for line in lines])
         if len(all_coords) > 0:
-            margin = 0.1  # 10% margin
             x_range = all_coords[:, 0].max() - all_coords[:, 0].min()
             y_range = all_coords[:, 1].max() - all_coords[:, 1].min()
+            x_margin = margin_factor * x_range
+            y_margin = margin_factor * y_range
             ax.set_extent([
-                all_coords[:, 0].min() - margin * x_range,
-                all_coords[:, 0].max() + margin * x_range,
-                all_coords[:, 1].min() - margin * y_range,
-                all_coords[:, 1].max() + margin * y_range
+                all_coords[:, 0].min() - x_margin,
+                all_coords[:, 0].max() + x_margin,
+                all_coords[:, 1].min() - y_margin,
+                all_coords[:, 1].max() + y_margin
             ], crs=ccrs.PlateCarree())
         
         # Add gridlines
@@ -198,11 +207,14 @@ def plot_network_pipeline_flow_results(network, backend="auto", shapefile_path=N
             )
             gdf_points = gdf_points.to_crs(epsg=3857)  # Web Mercator
             
-            # Set axis limits
+            # Set axis limits with configurable margin
             bounds = gdf_points.total_bounds
-            margin = 1000  # 1km margin in meters
-            ax.set_xlim(bounds[0] - margin, bounds[2] + margin)
-            ax.set_ylim(bounds[1] - margin, bounds[3] + margin)
+            x_range = bounds[2] - bounds[0]  # max_x - min_x
+            y_range = bounds[3] - bounds[1]  # max_y - min_y
+            x_margin = margin_factor * x_range
+            y_margin = margin_factor * y_range
+            ax.set_xlim(bounds[0] - x_margin, bounds[2] + x_margin)
+            ax.set_ylim(bounds[1] - y_margin, bounds[3] + y_margin)
             
             # Add basemap with multiple provider fallbacks
             basemap_providers = []

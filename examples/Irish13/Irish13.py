@@ -49,24 +49,30 @@ if shapefile_path.exists():
 else:
     print("Shapefile not found, trying alternative backends")
 
-print("2. Trying contextily backend")
+print("2. Trying contextily backend with custom styling")
 try:
     fig2, ax2 = plot_network_pipeline_flow_results(
         network, 
         backend="contextily",
         pipeline_color="#FF6B6B",
+        line_width_scale=2.0,
+        min_line_width=1.0,
+        margin_factor=0.3,
         figsize=(12, 10)
     )
     plt.show()
 except Exception as e:
     print(f"   Contextily backend failed: {e}")
 
-print("3. Trying cartopy backend")
+print("3. Trying cartopy backend with thick lines")
 try:
     fig3, ax3 = plot_network_pipeline_flow_results(
         network, 
         backend="cartopy",
         pipeline_color="#4ECDC4",
+        line_width_scale=3.0,
+        min_line_width=2.0,
+        margin_factor=0.15,
         figsize=(12, 10)
     )
     plt.show()
@@ -74,13 +80,15 @@ except Exception as e:
     print(f"   Cartopy backend failed: {e}")
 
 
-print("4. Automatically select backend")
+print("4. Auto backend with default margins and styling")
 fig4, ax4 = plot_network_pipeline_flow_results(
     network, 
     backend="auto",
     shapefile_path=shapefile_path if shapefile_path.exists() else None,
     pipeline_color="#FFD93D",
     alpha=0.8,
+    line_width_scale=1.5,
+    margin_factor=0.2,  # Default 20% margin
     figsize=(10, 8)
 )
 plt.show()
