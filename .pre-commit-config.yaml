@@ -3,7 +3,8 @@ repos:
     hooks:
       - id: export
         name: Export requirements.txt from pyproject.toml
-        entry: poetry export -f requirements.txt --output requirements.txt --without-hashes
+#        entry: poetry export -f requirements.txt --output requirements.txt --without-hashes
+        entry: bash -c 'diff <(poetry export -f requirements.txt --without-hashes) requirements.txt'
         language: system
         files: ^pyproject\.toml$
         pass_filenames: false
