@@ -13,6 +13,7 @@
 
 from pathlib import Path
 from timeit import default_timer as timer
+import matplotlib.pyplot as plt
 
 import GasNetSim as gns
 from GasNetSim.components.utils.plot_functions import plot_network_pipeline_flow_results
@@ -34,4 +35,53 @@ end = timer()
 
 print(f"Simulation time using NumPy: {end - start}")
 
-plot_network_pipeline_flow_results(network, shapefile_path=Path("./ie_10km.shp"))
+
+shapefile_path = Path("./ie_10km.shp")
+if shapefile_path.exists():
+    print("1. Using shapefile backend with ie_10km.shp")
+    fig1, ax1 = plot_network_pipeline_flow_results(
+        network, 
+        backend="shapefile", 
+        shapefile_path=shapefile_path,
+        figsize=(10, 12)
+    )
+    plt.show()
+else:
+    print("Shapefile not found, trying alternative backends")
+
+print("2. Trying contextily backend")
+try:
+    fig2, ax2 = plot_network_pipeline_flow_results(
+        network, 
+        backend="contextily",
+        pipeline_color="#FF6B6B",
+        figsize=(12, 10)
+    )
+    plt.show()
+except Exception as e:
+    print(f"   Contextily backend failed: {e}")
+
+print("3. Trying cartopy backend")
+try:
+    fig3, ax3 = plot_network_pipeline_flow_results(
+        network, 
+        backend="cartopy",
+        pipeline_color="#4ECDC4",
+        figsize=(12, 10)
+    )
+    plt.show()
+except Exception as e:
+    print(f"   Cartopy backend failed: {e}")
+
+
+print("4. Automatically select backend")
+fig4, ax4 = plot_network_pipeline_flow_results(
+    network, 
+    backend="auto",
+    shapefile_path=shapefile_path if shapefile_path.exists() else None,
+    pipeline_color="#FFD93D",
+    alpha=0.8,
+    figsize=(10, 8)
+)
+plt.show()
+
