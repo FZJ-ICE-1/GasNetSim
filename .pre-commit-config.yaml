@@ -2,9 +2,9 @@ repos:
   - repo: local
     hooks:
       - id: export
-        name: Export requirements.txt from pyproject.toml
+        name: Check requirements.txt matches export from pyproject.toml
 #        entry: poetry export -f requirements.txt --output requirements.txt --without-hashes
-        entry: bash -c 'diff <(poetry export -f requirements.txt --without-hashes) requirements.txt'
+        entry: bash -c 'poetry env use python3.12 && diff <(poetry export -f requirements.txt --without-hashes) requirements.txt'
         language: system
         files: ^pyproject\.toml$
         pass_filenames: false

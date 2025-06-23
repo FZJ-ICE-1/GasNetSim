@@ -33,14 +33,10 @@ pre-commit:
   image: python:3.12
   before_script:
     - python -m pip install --upgrade pip
-    - pip install virtualenv
-    # Create and activate virtual environment
-    - virtualenv venv
-    - source venv/bin/activate
-    - pip install poetry  # Install Poetry in the CI environment
-    - pip install poetry-plugin-export
+    - pip install poetry poetry-plugin-export pre-commit
     - export PATH="$HOME/.local/bin:$PATH"
     - poetry --version    # Verify Poetry installation
+    - poetry env use python3.12  # ensures consistent export
     - pip install pre-commit  # Install pre-commit if needed
   script:
     - pre-commit run --all-files  # Run pre-commit hooks
