@@ -439,6 +439,8 @@ def calculate_nodal_inflow_states(
     graph, edge_index = create_directed_graph_using_flow_directions(connections)
     edge_orders = topological_sort_of_edges(graph, edge_index)
 
+    print(p for p in pipelines.keys())
+
     while to_update:
         # connections_copy = connections.copy()
         # if tracking_method == "batch_tracking":

@@ -480,45 +480,51 @@ class Network:
         # pipeline_with_missing_pressure = copy.deepcopy(pipelines)
         pressure_init_old = list()
 
-        while pressure_init != pressure_init_old:
-            pressure_init_old = copy.deepcopy(pressure_init)
-            # pipeline_initialized = list()
-            for r in resistance:
-                inlet_node_id = r[0]  # inlet node ID (domain)
-                outlet_node_id = r[1]  # outlet node ID (domain)
-                i = self.node_id_to_simulation_node_index(inlet_node_id)  # simulation index
-                j = self.node_id_to_simulation_node_index(outlet_node_id)  # simulation index
-                res = r[2]  # resistance
-                flow = r[3]
-                if pressure_init[i] is None and pressure_init[j] is None:
-                    pass
-                elif pressure_init[j] is None or pressure_init[i] == pressure_init[j]:
-                    pressure_init[j] = pressure_init[i] * (
-                        1 - 0.05 * (res / max_resistance) * (flow / max_flow)
-                    )
-                    # pressure_init[j] = pressure_init[i] * (1 - 0.0001)
-                    # if res/max_resistance < 0.001:
-                    #     pressure_init[j] = pressure_init[i] * 0.999999
-                    # else:
-                    #     pressure_init[j] = pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow))
-                    # pressure_init[j] = pressure_init[i] * 0.98
-                # elif pressure_init[j] is not None and pressure_init[i] is not None:
-                #     if res/max_resistance < 0.001:
-                #         pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.99999)
-                #     else:
-                #         pressure_init[j] = min(pressure_init[j],
-                #                                pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow)))
-                #         # pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.98)
-                elif pressure_init[i] is None and pressure_init[j] is not None:
-                    pressure_init[i] = pressure_init[j] / (
-                        1 - 0.05 * (res / max_resistance) * (flow / max_flow)
-                    )
-                    # pressure_init[i] = pressure_init[j] / (1 - 0.0001)
-                    # if res/max_resistance < 0.001:
-                    #     pressure_init[i] = pressure_init[j] / 0.99999
-                    # else:
-                    #     pressure_init[i] = pressure_init[j] / (1 - 0.05 * (res/max_resistance) * (flow /max_flow))
-                    # pressure_init[i] = pressure_init[j] / 0.98
+        import numpy as np
+
+        max_pressure = 70*bar + atm
+        pressure_init = np.random.uniform(0.8 * max_pressure, 1.0 * max_pressure, size=len(pressure_init)).tolist()
+
+
+        # while pressure_init != pressure_init_old:
+        #     pressure_init_old = copy.deepcopy(pressure_init)
+        #     # pipeline_initialized = list()
+        #     for r in resistance:
+        #         inlet_node_id = r[0]  # inlet node ID (domain)
+        #         outlet_node_id = r[1]  # outlet node ID (domain)
+        #         i = self.node_id_to_simulation_node_index(inlet_node_id)  # simulation index
+        #         j = self.node_id_to_simulation_node_index(outlet_node_id)  # simulation index
+        #         res = r[2]  # resistance
+        #         flow = r[3]
+        #         if pressure_init[i] is None and pressure_init[j] is None:
+        #             pass
+        #         elif pressure_init[j] is None or pressure_init[i] == pressure_init[j]:
+        #             pressure_init[j] = pressure_init[i] * (
+        #                 1 - 0.05 * (res / max_resistance) * (flow / max_flow)
+        #             )
+        #             # pressure_init[j] = pressure_init[i] * (1 - 0.0001)
+        #             # if res/max_resistance < 0.001:
+        #             #     pressure_init[j] = pressure_init[i] * 0.999999
+        #             # else:
+        #             #     pressure_init[j] = pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow))
+        #             # pressure_init[j] = pressure_init[i] * 0.98
+        #         # elif pressure_init[j] is not None and pressure_init[i] is not None:
+        #         #     if res/max_resistance < 0.001:
+        #         #         pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.99999)
+        #         #     else:
+        #         #         pressure_init[j] = min(pressure_init[j],
+        #         #                                pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow)))
+        #         #         # pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.98)
+        #         elif pressure_init[i] is None and pressure_init[j] is not None:
+        #             pressure_init[i] = pressure_init[j] / (
+        #                 1 - 0.05 * (res / max_resistance) * (flow / max_flow)
+        #             )
+        #             # pressure_init[i] = pressure_init[j] / (1 - 0.0001)
+        #             # if res/max_resistance < 0.001:
+        #             #     pressure_init[i] = pressure_init[j] / 0.99999
+        #             # else:
+        #             #     pressure_init[i] = pressure_init[j] / (1 - 0.05 * (res/max_resistance) * (flow /max_flow))
+        #             # pressure_init[i] = pressure_init[j] / 0.98
 
         return pressure_init
 
@@ -576,6 +582,12 @@ class Network:
             pressure_init = self.pressure_initialization()
         else:
             pressure_init = self.pressure_prev
+
+        number_of_none_pressure = 1
+        for i, p in enumerate(pressure_init):
+            if p is None:
+                pressure_init[i] = min([x for x in pressure_init if x is not None]) - number_of_none_pressure * 1e3
+                number_of_none_pressure += 1
 
         for i in range(len(nodal_flow_init)):
             node_id = self.simulation_node_index_to_node_id(i)
@@ -911,23 +923,23 @@ class Network:
                     pipeline.batch_location_history = cached_batch_information[i][0][:]
                     pipeline.composition_history = cached_batch_information[i][1][:]
 
-            nodal_gas_inflow_composition, self.pipelines, self.nodes = calculate_nodal_inflow_states(
-                self.nodes,
-                self.pipelines,
-                cached_batch_information,
-                self.connections,
-                mapping_connections,
-                tracking_method=tracking_method,
-                network=self,
-            )
+            # nodal_gas_inflow_composition, self.pipelines, self.nodes = calculate_nodal_inflow_states(
+            #     self.nodes,
+            #     self.pipelines,
+            #     cached_batch_information,
+            #     self.connections,
+            #     mapping_connections,
+            #     tracking_method=tracking_method,
+            #     network=self,
+            # )
 
-            # inflow_xi, inflow_temp = calculate_nodal_inflow_states(self.nodes, self.connections,
-            #                                                        mapping_connections, f_mat)
-            # nodal_gas_inflow_composition = inflow_xi
-            # nodal_gas_inflow_temperature = inflow_temp
-            update_temporary_nodal_gas_mixture_properties(
-                self, nodal_gas_inflow_composition
-            )
+            # # inflow_xi, inflow_temp = calculate_nodal_inflow_states(self.nodes, self.connections,
+            # #                                                        mapping_connections, f_mat)
+            # # nodal_gas_inflow_composition = inflow_xi
+            # # nodal_gas_inflow_temperature = inflow_temp
+            # update_temporary_nodal_gas_mixture_properties(
+            #     self, nodal_gas_inflow_composition
+            # )
 
             if use_cuda:
                 nodal_flow = cp.sum(f_mat, axis=1)
@@ -964,6 +976,9 @@ class Network:
                 ],
                 use_cuda=use_cuda,
             )
+
+            print(f"Rows{np.where(~j_mat.any(axis=1))}, Cols{np.where(~j_mat.any(axis=0))}")
+            print(f"Jacobian matrix rank: {np.linalg.matrix_rank(j_mat)} / {j_mat.shape[0]}")
 
             if use_cuda:
                 delta_p = cp.linalg.solve(j_mat, delta_flow)
@@ -1011,6 +1026,17 @@ class Network:
             )
             err = max([abs(x) for x in delta_flow])
 
+            print(f"Current iteration number: {n_iter}")
+            print(f"{max([n.pressure for n in self.nodes.values()])}")
+            print(f"{min([n.pressure for n in self.nodes.values()])}")
+            print([x.flow_rate for x in self.pipelines.values()])
+            print([x.temperature for x in self.nodes.values()])
+            print(f"Volumetric flow target: {f_target}")
+            print(f"Error between calculated flow and the target flow: {delta_flow}")
+            print(f"Node {np.where(np.abs(delta_flow) > tol)[0]}: {delta_flow[np.where(np.abs(delta_flow) > tol)[0]]}")
+            print(f"Pressure change after each iteration: {max(abs(delta_p))}")
+            print(f"Nodal Pressure: {p}")
+            
             logging.debug(max([abs(x) for x in (delta_flow / target_flow)]))
             logging.debug(delta_p)
             self.update_connection_flow_rate()
@@ -1027,16 +1053,6 @@ class Network:
             # plt.plot(delta_flow)
             # plt.show()
 
-            # print(f"Current iteration number: {n_iter}")
-            # print(f"{max([n.pressure for n in self.nodes.values()])}")
-            # print(f"{min([n.pressure for n in self.nodes.values()])}")
-            # print([x.flow_rate for x in self.pipelines.values()])
-            # print([x.temperature for x in self.nodes.values()])
-            # print(f"Volumetric flow target: {f_target}")
-            # print(f"Error between calculated flow and the target flow: {delta_flow}")
-            # print(f"Node {np.where(np.abs(delta_flow) > tol)[0]}: {delta_flow[np.where(np.abs(delta_flow) > tol)[0]]}")
-            # print(f"Pressure change after each iteration: {max(abs(delta_p))}")
-            # print(f"Nodal Pressure: {p}")
 
             # simulation does not converge
             if n_iter >= max_iter:

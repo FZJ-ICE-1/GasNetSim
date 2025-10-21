@@ -50,7 +50,7 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
     :return: A dictionary of node indices to Node objects.
     """
     nodes = {}
-    df_node = pd.read_csv(path_to_file, delimiter=";")
+    df_node = pd.read_csv(path_to_file, delimiter=";", comment="#")
     df_node = df_node.replace({np.nan: None})
 
     if base_composition is None:
@@ -99,11 +99,14 @@ def read_pipelines(
     :return:
     """
     pipelines = dict()
-    df_pipe = pd.read_csv(path_to_file, delimiter=";")
+    df_pipe = pd.read_csv(path_to_file, delimiter=";", comment="#")
     df_pipe = df_pipe.replace({np.nan: None})
+
+    print("[INFO] Reading pipelines from:", path_to_file)
 
     for row_index, row in df_pipe.iterrows():
         friction_method = row.get("friction_method", "chen") or "chen"
+        print(row["inlet_index"], type(row["inlet_index"]))
         pipelines[row["pipeline_index"]] = Pipeline(
             pipeline_index=row["pipeline_index"],
             inlet=network_nodes[row["inlet_index"]],
