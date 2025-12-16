@@ -42,15 +42,17 @@ def convert_gas_composition(gas_composition: str) -> OrderedDict:
         )
 
 
-def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
+def read_nodes(path_to_file: Path, base_composition=None, sep=";") -> dict[int, Node]:
     """
     Read nodes from a CSV file and create Node objects.
 
     :param path_to_file: Path to the CSV file containing nodes information.
+    :param base_composition: Base gas composition to use to enable better initialization.
+    :param sep: CSV file delimiter/separator (default: ";").
     :return: A dictionary of node indices to Node objects.
     """
     nodes = {}
-    df_node = pd.read_csv(path_to_file, delimiter=";", comment="#")
+    df_node = pd.read_csv(path_to_file, delimiter=sep, comment="#")
     df_node = df_node.replace({np.nan: None})
 
     if base_composition is None:
@@ -90,16 +92,18 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
 
 
 def read_pipelines(
-    path_to_file: Path, network_nodes: dict, conversion_factor=1.0
+    path_to_file: Path, network_nodes: dict, conversion_factor=1.0, sep=";"
 ) -> dict:
     """
 
     :param path_to_file:
     :param network_nodes:
+    :param conversion_factor: unit conversion factor
+    :param sep: CSV file delimiter/separator (default: ";").
     :return:
     """
     pipelines = dict()
-    df_pipe = pd.read_csv(path_to_file, delimiter=";", comment="#")
+    df_pipe = pd.read_csv(path_to_file, delimiter=sep, comment="#")
     df_pipe = df_pipe.replace({np.nan: None})
 
     print("[INFO] Reading pipelines from:", path_to_file)
@@ -119,18 +123,19 @@ def read_pipelines(
     return pipelines
 
 
-def read_compressors(path_to_file: Path, network_nodes: dict) -> dict:
+def read_compressors(path_to_file: Path, network_nodes: dict, sep=";") -> dict:
     """
     Read compressors from a CSV file and create Compressor objects.
 
     :param path_to_file: Path to the CSV file containing compressor information.
     :param network_nodes: Dictionary of existing network nodes.
+    :param sep: CSV file delimiter/separator (default: ";").
     :return: A dictionary of compressor indices to Compressor objects.
     """
     compressors = dict()
-    
+
     try:
-        df_compressors = pd.read_csv(path_to_file, delimiter=";")
+        df_compressors = pd.read_csv(path_to_file, delimiter=sep)
         df_compressors = df_compressors.replace({np.nan: None})
         
         for index, row in df_compressors.iterrows():
@@ -167,15 +172,16 @@ def read_compressors(path_to_file: Path, network_nodes: dict) -> dict:
     return compressors
 
 
-def read_resistances(path_to_file: Path, network_nodes: dict) -> dict:
+def read_resistances(path_to_file: Path, network_nodes: dict, sep=";") -> dict:
     """
 
     :param path_to_file:
     :param network_nodes:
+    :param sep: CSV file delimiter/separator (default: ";").
     :return:
     """
     resistances = dict()
-    df_resistance = pd.read_csv(path_to_file, delimiter=";")
+    df_resistance = pd.read_csv(path_to_file, delimiter=sep)
     df_resistance = df_resistance.replace({np.nan: None})
 
     for row_index, row in df_resistance.iterrows():
@@ -187,15 +193,16 @@ def read_resistances(path_to_file: Path, network_nodes: dict) -> dict:
     return resistances
 
 
-def read_linear_resistances(path_to_file: Path, network_nodes: dict) -> dict:
+def read_linear_resistances(path_to_file: Path, network_nodes: dict, sep=";") -> dict:
     """
 
     :param path_to_file:
     :param network_nodes:
+    :param sep: CSV file delimiter/separator (default: ";").
     :return:
     """
     resistances = dict()
-    df_linear_resistance = pd.read_csv(path_to_file, delimiter=";")
+    df_linear_resistance = pd.read_csv(path_to_file, delimiter=sep)
     df_linear_resistance = df_linear_resistance.replace({np.nan: None})
 
     for row_index, row in df_linear_resistance.iterrows():
@@ -207,15 +214,16 @@ def read_linear_resistances(path_to_file: Path, network_nodes: dict) -> dict:
     return resistances
 
 
-def read_shortpipes(path_to_file: Path, network_nodes: dict) -> dict:
+def read_shortpipes(path_to_file: Path, network_nodes: dict, sep=";") -> dict:
     """
 
     :param path_to_file:
     :param network_nodes:
+    :param sep: CSV delimiter/separator (default: ";").
     :return:
     """
     shortpipes = dict()
-    df_shortpipes = pd.read_csv(path_to_file, delimiter=";")
+    df_shortpipes = pd.read_csv(path_to_file, delimiter=sep)
     df_shortpipes = df_shortpipes.replace({np.nan: None})
 
     for row_index, row in df_shortpipes.iterrows():
@@ -230,13 +238,15 @@ import warnings
 
 
 def create_network_from_csv(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path, conversion_factor=1.0, base_composition=None, sep=";"
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
 
     :param path_to_folder: Path to the folder containing the CSV files.
     :param conversion_factor: Conversion factor for pipeline data.
+    :param base_composition: Base gas composition to use for better initialization.
+    :param sep: CSV file delimiter/separator (default: ";").
     :return: A Network object.
     """
     warnings.warn(
@@ -246,18 +256,20 @@ def create_network_from_csv(
         stacklevel=2,
     )
     return create_network_from_folder(
-        path_to_folder, conversion_factor, base_composition
+        path_to_folder, conversion_factor, base_composition, sep
     )
 
 
 def create_network_from_folder(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path, conversion_factor=1.0, base_composition=None, sep=";"
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
 
     :param path_to_folder: Path to the folder containing the CSV files.
     :param conversion_factor: Conversion factor for pipeline data.
+    :param base_composition: Base gas composition to use for better initialization.
+    :param sep: CSV file delimiter/separator (default: ";").
     :return: A Network object.
     """
     all_files = list(path_to_folder.glob("*.csv"))
@@ -266,7 +278,7 @@ def create_network_from_folder(
     if nodes_file is None:
         raise FileNotFoundError("Nodes file is required to create the network.")
 
-    nodes = read_nodes(nodes_file, base_composition=base_composition)
+    nodes = read_nodes(nodes_file, base_composition=base_composition, sep=sep)
 
     # Initialize network components
     network_components = {
@@ -294,10 +306,10 @@ def create_network_from_folder(
             if component_key in file_name:
                 if component_key == "pipeline":
                     network_components[component_key + "s"] = read_function(
-                        file, nodes, conversion_factor
+                        file, nodes, conversion_factor, sep
                     )
                 else:
-                    network_components[component_key + "s"] = read_function(file, nodes)
+                    network_components[component_key + "s"] = read_function(file, nodes, sep)
                 break
 
     # Create and return the Network object
@@ -312,13 +324,14 @@ def create_network_from_folder(
 
 
 def create_network_from_files(
-    component_files: dict[str, Path], conversion_factor=1.0
+    component_files: dict[str, Path], conversion_factor=1.0, sep=";"
 ) -> Network:
     """
     Create a Network object from specified component CSV files.
 
     :param component_files: A dictionary mapping component names (e.g., 'nodes', 'pipelines') to file paths.
     :param conversion_factor: Conversion factor for pipeline data.
+    :param sep: CSV file delimiter/separator (default: ";").
     :return: A Network object.
     """
     # Ensure nodes file is provided
@@ -327,7 +340,7 @@ def create_network_from_files(
         raise ValueError("Nodes file is required to create the network.")
 
     # Read nodes
-    nodes = read_nodes(nodes_file)
+    nodes = read_nodes(nodes_file, sep=sep)
 
     # Initialize network components
     network_components = {
@@ -353,11 +366,11 @@ def create_network_from_files(
         if component_name in component_files:
             if component_name == "pipelines":
                 network_components[component_name] = read_function(
-                    component_files[component_name], nodes, conversion_factor
+                    component_files[component_name], nodes, conversion_factor, sep
                 )
             else:
                 network_components[component_name] = read_function(
-                    component_files[component_name], nodes
+                    component_files[component_name], nodes, sep
                 )
 
     # Create and return the Network object
