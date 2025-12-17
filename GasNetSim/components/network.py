@@ -480,51 +480,51 @@ class Network:
         # pipeline_with_missing_pressure = copy.deepcopy(pipelines)
         pressure_init_old = list()
 
-        import numpy as np
+        # import numpy as np
+        #
+        # max_pressure = 70*bar + atm
+        # pressure_init = np.random.uniform(0.8 * max_pressure, 1.0 * max_pressure, size=len(pressure_init)).tolist()
 
-        max_pressure = 70*bar + atm
-        pressure_init = np.random.uniform(0.8 * max_pressure, 1.0 * max_pressure, size=len(pressure_init)).tolist()
 
-
-        # while pressure_init != pressure_init_old:
-        #     pressure_init_old = copy.deepcopy(pressure_init)
-        #     # pipeline_initialized = list()
-        #     for r in resistance:
-        #         inlet_node_id = r[0]  # inlet node ID (domain)
-        #         outlet_node_id = r[1]  # outlet node ID (domain)
-        #         i = self.node_id_to_simulation_node_index(inlet_node_id)  # simulation index
-        #         j = self.node_id_to_simulation_node_index(outlet_node_id)  # simulation index
-        #         res = r[2]  # resistance
-        #         flow = r[3]
-        #         if pressure_init[i] is None and pressure_init[j] is None:
-        #             pass
-        #         elif pressure_init[j] is None or pressure_init[i] == pressure_init[j]:
-        #             pressure_init[j] = pressure_init[i] * (
-        #                 1 - 0.05 * (res / max_resistance) * (flow / max_flow)
-        #             )
-        #             # pressure_init[j] = pressure_init[i] * (1 - 0.0001)
-        #             # if res/max_resistance < 0.001:
-        #             #     pressure_init[j] = pressure_init[i] * 0.999999
-        #             # else:
-        #             #     pressure_init[j] = pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow))
-        #             # pressure_init[j] = pressure_init[i] * 0.98
-        #         # elif pressure_init[j] is not None and pressure_init[i] is not None:
-        #         #     if res/max_resistance < 0.001:
-        #         #         pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.99999)
-        #         #     else:
-        #         #         pressure_init[j] = min(pressure_init[j],
-        #         #                                pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow)))
-        #         #         # pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.98)
-        #         elif pressure_init[i] is None and pressure_init[j] is not None:
-        #             pressure_init[i] = pressure_init[j] / (
-        #                 1 - 0.05 * (res / max_resistance) * (flow / max_flow)
-        #             )
-        #             # pressure_init[i] = pressure_init[j] / (1 - 0.0001)
-        #             # if res/max_resistance < 0.001:
-        #             #     pressure_init[i] = pressure_init[j] / 0.99999
-        #             # else:
-        #             #     pressure_init[i] = pressure_init[j] / (1 - 0.05 * (res/max_resistance) * (flow /max_flow))
-        #             # pressure_init[i] = pressure_init[j] / 0.98
+        while pressure_init != pressure_init_old:
+            pressure_init_old = copy.deepcopy(pressure_init)
+            # pipeline_initialized = list()
+            for r in resistance:
+                inlet_node_id = r[0]  # inlet node ID (domain)
+                outlet_node_id = r[1]  # outlet node ID (domain)
+                i = self.node_id_to_simulation_node_index(inlet_node_id)  # simulation index
+                j = self.node_id_to_simulation_node_index(outlet_node_id)  # simulation index
+                res = r[2]  # resistance
+                flow = r[3]
+                if pressure_init[i] is None and pressure_init[j] is None:
+                    pass
+                elif pressure_init[j] is None or pressure_init[i] == pressure_init[j]:
+                    pressure_init[j] = pressure_init[i] * (
+                        1 - 0.01 * (res / max_resistance) * (flow / max_flow)
+                    )
+                    # pressure_init[j] = pressure_init[i] * (1 - 0.0001)
+                    # if res/max_resistance < 0.001:
+                    #     pressure_init[j] = pressure_init[i] * 0.999999
+                    # else:
+                    #     pressure_init[j] = pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow))
+                    # pressure_init[j] = pressure_init[i] * 0.98
+                # elif pressure_init[j] is not None and pressure_init[i] is not None:
+                #     if res/max_resistance < 0.001:
+                #         pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.99999)
+                #     else:
+                #         pressure_init[j] = min(pressure_init[j],
+                #                                pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow)))
+                #         # pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.98)
+                elif pressure_init[i] is None and pressure_init[j] is not None:
+                    pressure_init[i] = pressure_init[j] / (
+                        1 - 0.01 * (res / max_resistance) * (flow / max_flow)
+                    )
+                    # pressure_init[i] = pressure_init[j] / (1 - 0.0001)
+                    # if res/max_resistance < 0.001:
+                    #     pressure_init[i] = pressure_init[j] / 0.99999
+                    # else:
+                    #     pressure_init[i] = pressure_init[j] / (1 - 0.05 * (res/max_resistance) * (flow /max_flow))
+                    # pressure_init[i] = pressure_init[j] / 0.98
 
         return pressure_init
 
@@ -952,7 +952,7 @@ class Network:
                 [
                     delta_flow[i]
                     for i in range(len(delta_flow))
-                    if i + 1 not in self.non_junction_nodes
+                    if self.simulation_node_index_to_node_id(i) not in self.non_junction_nodes
                 ],
                 use_cuda=use_cuda,
             )
@@ -1020,7 +1020,7 @@ class Network:
                 [
                     f_target[i]
                     for i in range(len(f_target))
-                    if i + 1 not in self.non_junction_nodes
+                    if self.simulation_node_index_to_node_id(i) not in self.non_junction_nodes
                 ],
                 use_cuda=use_cuda,
             )

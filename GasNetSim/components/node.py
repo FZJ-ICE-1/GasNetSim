@@ -82,7 +82,7 @@ class Node:
         except (TypeError, AttributeError):
             # If pressure or temperature is missing for some nodes
             self.gas_mixture = GasMixture(
-                composition=self.gas_composition, temperature=288.15, pressure=50 * bar
+                composition=self.gas_composition, temperature=288.15, pressure=70 * bar
             )
 
         self.volumetric_flow = volumetric_flow
@@ -108,9 +108,9 @@ class Node:
                                           temperature=self.temperature,
                                           pressure=self.pressure)
         except (TypeError, AttributeError):
-            self.gas_mixture = GasMixture(composition=NATURAL_GAS_gri30,
+            self.gas_mixture = GasMixture(composition=HYDROGEN,
                                           temperature=288.15,
-                                          pressure=50 * bar)
+                                          pressure=70 * bar)
 
     def get_mole_fraction(self):
         """
