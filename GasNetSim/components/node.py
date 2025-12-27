@@ -3,13 +3,14 @@
 #   ******************************************************************************
 #     Copyright (c) 2024.
 #     Developed by Yifei Lu
-#     Last change on 8/22/24, 9:34 AM
+#     Last change on 10/17/24, 4:42 PM
 #     Last change by yifei
 #    *****************************************************************************
 from scipy.constants import bar
 
 from .gas_mixture.typical_mixture_composition import NATURAL_GAS_gri30
 from .gas_mixture.gas_mixture import GasMixture
+from ..utils.exception import InitializationError
 
 
 class Node:
@@ -17,9 +18,20 @@ class Node:
     Class to formulate gas transmission network nodes.
     """
 
-    def __init__(self, node_index, volumetric_flow=None, energy_flow=None, pressure_pa=None,
-                 temperature=288.15, altitude=0, gas_composition=None, node_type='demand',
-                 longitude=None, latitude=None):
+    def __init__(
+        self,
+        node_index,
+        volumetric_flow=None,
+        energy_flow=None,
+        pressure_pa=None,
+        temperature=288.15,
+        altitude=0,
+        gas_composition=None,
+        node_type="demand",
+        flow_type=None,
+        longitude=None,
+        latitude=None,
+    ):
         """
         Initial method
         :param node_index: Node index
@@ -52,51 +64,53 @@ class Node:
         if node_type is not None:
             self.node_type = node_type
         else:
-            self.node_type = 'demand'
+            self.node_type = "demand"
         self.longitude = longitude
         self.latitude = latitude
         # flow type
-        # if flow_type is not None:
-        #     self.flow_type = flow_type
-        # else:
-        #     self.flow_type = 'volumetric'
+        if flow_type is not None:
+            self.flow_type = flow_type
+        else:
+            self.flow_type = "volumetric"
 
         try:
-            self.gas_mixture = GasMixture(composition=self.gas_composition,
-                                          temperature=self.temperature,
-                                          pressure=self.pressure)
+            self.gas_mixture = GasMixture(
+                composition=self.gas_composition,
+                temperature=self.temperature,
+                pressure=self.pressure,
+            )
         except (TypeError, AttributeError):
             # If pressure or temperature is missing for some nodes
-            self.gas_mixture = GasMixture(composition=self.gas_composition,
-                                          temperature=288.15,
-                                          pressure=50 * bar)
+            self.gas_mixture = GasMixture(
+                composition=self.gas_composition, temperature=288.15, pressure=50 * bar
+            )
 
-        # self.flow = flow
         self.volumetric_flow = volumetric_flow
         self.energy_flow = energy_flow
-        if volumetric_flow is not None:
+
+        if self.flow_type == "volumetric" and volumetric_flow is not None:
             try:
                 self.convert_volumetric_to_energy_flow()
             except TypeError:
                 self.energy_flow = None
-        elif energy_flow is not None:
+        elif self.flow_type == "energy" and energy_flow is not None:
             try:
                 self.convert_energy_to_volumetric_flow()
             except TypeError:
                 self.volumetric_flow = None
         else:
             if pressure_pa is None:
-                raise InitializationError("Either pressure or flow should be known.")
+                raise InitializationError(f"Either pressure or flow should be known: node {self.index}.")
 
-    # def update_gas_mixture(self):
-    #     try:
-    #         self.gas_mixture = GasMixture(composition=self.get_mole_fraction(),
-    #                                       temperature=self.temperature,
-    #                                       pressure=self.pressure)
-    #     except (TypeError, AttributeError):
-    #         self.gas_mixture = GasMixture(composition=NATURAL_GAS_gri30,
-    #                                       temperature=288.15,
-    #                                       pressure=50 * bar)
+    def update_gas_mixture(self):
+        try:
+            self.gas_mixture = GasMixture(composition=self.get_mole_fraction(),
+                                          temperature=self.temperature,
+                                          pressure=self.pressure)
+        except (TypeError, AttributeError):
+            self.gas_mixture = GasMixture(composition=NATURAL_GAS_gri30,
+                                          temperature=288.15,
+                                          pressure=50 * bar)
 
     def get_mole_fraction(self):
         """
@@ -120,7 +134,9 @@ class Node:
         """
         # HHV = calc_heating_value(self.gas_mixture)
         # HHV = self.gas_mixture.heating_value(hhv=True, parameter="mass")
-        self.volumetric_flow = self.energy_flow / self.gas_mixture.HHV_J_per_sm3 * 1e6  # sm3/s
+        self.volumetric_flow = (
+            self.energy_flow / self.gas_mixture.HHV_J_per_sm3 * 1e6
+        )  # sm3/s
 
     def convert_volumetric_to_energy_flow(self):
         """
@@ -128,7 +144,9 @@ class Node:
         :return:
         """
         # HHV = self.gas_mixture.heating_value(hhv=True, parameter="mass")
-        self.energy_flow = self.volumetric_flow * self.gas_mixture.HHV_J_per_sm3 / 1e6  # MJ/s
+        self.energy_flow = (
+            self.volumetric_flow * self.gas_mixture.HHV_J_per_sm3 / 1e6
+        )  # MJ/s
 
 
 if __name__ == "__main__":

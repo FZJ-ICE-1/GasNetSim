@@ -6,11 +6,11 @@
 #    Last change on 3/7/22, 11:48 AM
 #    Last change by yifei
 #   *****************************************************************************
-import pandas as pd
-import numpy as np
-from data_cleaning import *
 from matplotlib import pyplot as plt
 from pandas.plotting import register_matplotlib_converters
+
+from data_cleaning import *
+
 register_matplotlib_converters()
 
 
@@ -41,8 +41,8 @@ def h_value(A, B, C, D, theta, theta_0=40.0, m_h=0, m_w=0, b_h=0, b_w=0):
     :param b_w:
     :return:
     """
-    f_sigmoid = A/(1+(B/(theta-theta_0))**C) + D
-    f_linear = max((m_h*theta + b_h), (m_w*theta + b_w))
+    f_sigmoid = A / (1 + (B / (theta - theta_0)) ** C) + D
+    f_linear = max((m_h * theta + b_h), (m_w * theta + b_w))
     return f_sigmoid + f_linear
 
 
@@ -54,17 +54,19 @@ def daily_demand(kw, h, f=1):
     :param f: Wochentagsfaktoren (around 1)
     :return:
     """
-    return kw*h*f
+    return kw * h * f
 
 
 def customer_value(Q_array, theta_array):
     h_sum = 0
     for theta in theta_array:
-        h_sum += h_value(3.1850191, -37.4124155, 6.1723179, 0.0761096, theta, 40.0, 0, 0, 0, 0)
-    return Q_array.sum()/h_sum
+        h_sum += h_value(
+            3.1850191, -37.4124155, 6.1723179, 0.0761096, theta, 40.0, 0, 0, 0, 0
+        )
+    return Q_array.sum() / h_sum
 
 
-def average_daily_ambient_temp(file, region='DEA2', frequency="hour"):
+def average_daily_ambient_temp(file, region="DEA2", frequency="hour"):
     """
 
     :param file: file path to temperature file
@@ -73,7 +75,7 @@ def average_daily_ambient_temp(file, region='DEA2', frequency="hour"):
     :return:
     """
     df = pd.read_csv(file)
-    filtered_cols = ['utc_timestamp']
+    filtered_cols = ["utc_timestamp"]
 
     for col in df.columns:
         if region in col:
@@ -85,26 +87,37 @@ def average_daily_ambient_temp(file, region='DEA2', frequency="hour"):
 
         daily_temp = list()
 
-        dates = pd.date_range(start='2014-12-28', end='2015-12-31', freq='D')
+        dates = pd.date_range(start="2014-12-28", end="2015-12-31", freq="D")
 
         dates = dates.to_list()
 
         for i in range(len(dates)):
-            daily_temp.append(regional_weather_data[region + '_temperature'][i*24:i*24 + 23].sum()/24)
+            daily_temp.append(
+                regional_weather_data[region + "_temperature"][
+                    i * 24 : i * 24 + 23
+                ].sum()
+                / 24
+            )
 
-        df_daily_temp = pd.DataFrame({'dates': dates, 'temp': daily_temp})
+        df_daily_temp = pd.DataFrame({"dates": dates, "temp": daily_temp})
 
         return df_daily_temp
     elif frequency == "hour":
-        df_hourly_temp = pd.DataFrame({'time': regional_weather_data['utc_timestamp'],
-                                       'temp': regional_weather_data['DEA2_temperature']})
+        df_hourly_temp = pd.DataFrame(
+            {
+                "time": regional_weather_data["utc_timestamp"],
+                "temp": regional_weather_data["DEA2_temperature"],
+            }
+        )
         return df_hourly_temp
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     T_allokation = calc_temp(-2.0, 0.5, 3.4, 3.6)
     print("AllokationsTemperatur ist: " + str(T_allokation))
-    h = h_value(3.1850191, -37.4124155, 6.1723179, 0.0761096, T_allokation, 40.0, 0, 0, 0, 0)
+    h = h_value(
+        3.1850191, -37.4124155, 6.1723179, 0.0761096, T_allokation, 40.0, 0, 0, 0, 0
+    )
     print("h-Wert ist: " + str(h))
     Q = daily_demand(50, h, 1)
     print("Tagesmenge ist: " + str(Q))
@@ -112,30 +125,43 @@ if __name__ == '__main__':
     temp_dea2 = average_daily_ambient_temp("weather_data_filtered.csv")
     sigmoid_coeffients = sigmoid_coef("data/EFH_sigmoid.csv")
 
-    nrw_sigmoid_coef_efh = sigmoid_coeffients['Class_3'].iloc[1, :]
+    nrw_sigmoid_coef_efh = sigmoid_coeffients["Class_3"].iloc[1, :]
 
     gas_consumption = pd.DataFrame()
 
     kundenwerte = [200, 100, 300, 300, 400, 150]
-    gas_consumption['time'] = range(1, 366)
+    gas_consumption["time"] = range(1, 366)
 
     for j in range(len(kundenwerte)):
         tmp = list()
         for i in range(4, 369):
-            T_ma = calc_temp(temp_dea2['temp'][i], temp_dea2['temp'][i-1],
-                                     temp_dea2['temp'][i-2], temp_dea2['temp'][i-3])
-            h = h_value(nrw_sigmoid_coef_efh[0], nrw_sigmoid_coef_efh[1], nrw_sigmoid_coef_efh[2], nrw_sigmoid_coef_efh[3],
-                        T_ma, 40.0, 0, 0, 0, 0)
+            T_ma = calc_temp(
+                temp_dea2["temp"][i],
+                temp_dea2["temp"][i - 1],
+                temp_dea2["temp"][i - 2],
+                temp_dea2["temp"][i - 3],
+            )
+            h = h_value(
+                nrw_sigmoid_coef_efh[0],
+                nrw_sigmoid_coef_efh[1],
+                nrw_sigmoid_coef_efh[2],
+                nrw_sigmoid_coef_efh[3],
+                T_ma,
+                40.0,
+                0,
+                0,
+                0,
+                0,
+            )
             Q = daily_demand(kundenwerte[j], h, 1)
             tmp.append(Q)
-        gas_consumption[f'{j+2}'] = tmp
+        gas_consumption[f"{j+2}"] = tmp
 
     plt.figure()
     plt.plot(gas_consumption)
     plt.show()
 
-    gas_consumption.to_csv('gas_profile.csv')
-
+    gas_consumption.to_csv("gas_profile.csv")
 
     # plt.plot(temp_dea2['dates'], temp_dea2['temp'])
 
@@ -146,4 +172,3 @@ if __name__ == '__main__':
     #     plt.figure()
     #     plt.plot(result_slp)
     #     plt.show()
-

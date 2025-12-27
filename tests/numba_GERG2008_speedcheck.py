@@ -7,50 +7,106 @@
 #     Last change by yifei
 #    *****************************************************************************
 
-from scipy.constants import bar
 from timeit import default_timer as timer
+
 from numba import prange
-from concurrent.futures import ProcessPoolExecutor
+from scipy.constants import bar
 
 from GasNetSim.components.gas_mixture.GERG2008 import *
 
 
 def speed_heating_value(repeats=10000):
     """
-        Speed check the numba version of the CalculateHeatingValue function of GasMixtureGERG2008 class.
+    Speed check the numba version of the CalculateHeatingValue function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = OrderedDict({})
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for _i in range(21):
         nist_gas_mixture[a[_i]] = b[_i]
 
     gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, gerg2008_composition, use_numba=False
+    )
 
     # Measure the execution time
     start_time = timer()
     for _ in range(repeats):
-        gas_mixture.CalculateHeatingValue(comp=gerg2008_composition, hhv=True, parameter="volume")
+        gas_mixture.CalculateHeatingValue(
+            comp=gerg2008_composition, hhv=True, parameter="volume"
+        )
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For {repeats} iterations, CalculateHeatingValue took {function_time:.6f} seconds.")
+    print(
+        f"For {repeats} iterations, CalculateHeatingValue took {function_time:.6f} seconds."
+    )
     molarmass = gas_mixture.MolarMass
     molardensity = gas_mixture.MolarDensity
     # Measure the execution time
     start_time = timer()
     for _ in range(repeats):
-        CalculateHeatingValue_numba(MolarMass=molarmass, MolarDensity=molardensity, comp=gerg2008_composition, hhv=True, parameter="volume")
+        CalculateHeatingValue_numba(
+            MolarMass=molarmass,
+            MolarDensity=molardensity,
+            comp=gerg2008_composition,
+            hhv=True,
+            parameter="volume",
+        )
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For {repeats} iterations, CalculateHeatingValue_numba took {function_time:.6f} seconds.")
+    print(
+        f"For {repeats} iterations, CalculateHeatingValue_numba took {function_time:.6f} seconds."
+    )
 
 
 def speed_convert_composition_gerg():
@@ -60,12 +116,54 @@ def speed_convert_composition_gerg():
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
 
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
@@ -79,7 +177,9 @@ def speed_convert_composition_gerg():
         expected_result = gas_mixture.CovertCompositionGERG(nist_gas_mixture)
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For 100 iterations, CovertCompositionGERG took {function_time:.6f} seconds.")
+    print(
+        f"For 100 iterations, CovertCompositionGERG took {function_time:.6f} seconds."
+    )
     expected_result.pop(0)
 
     # Calculate the converted composition using ConvertCompositionGERG method
@@ -89,21 +189,65 @@ def speed_convert_composition_gerg():
         converted_composition = CovertCompositionGERG_numba(nist_gas_mixture)
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For 100 iterations, CovertCompositionGERG_numba took {function_time:.6f} seconds.")
+    print(
+        f"For 100 iterations, CovertCompositionGERG_numba took {function_time:.6f} seconds."
+    )
 
 
 def speed_molarmass_gerg():
     """
-        Speed check the numba version of the MolarMassGERG method of GasMixtureGERG2008 class.
+    Speed check the numba version of the MolarMassGERG method of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015,
-                  0.00009, 0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
@@ -131,16 +275,58 @@ def speed_molarmass_gerg():
 
 def speed_pressure_gerg():
     """
-        Speed check the numba version of the PressureGERG method of GasMixtureGERG2008 class.
+    Speed check the numba version of the PressureGERG method of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
@@ -172,16 +358,58 @@ def speed_pressure_gerg():
 
 def speed_density_gerg():
     """
-        Speed check the numba version of the DensityGERG function of GasMixtureGERG2008 class.
+    Speed check the numba version of the DensityGERG function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
@@ -208,7 +436,9 @@ def speed_density_gerg():
     # Measure the execution time
     start_time = timer()
     for _ in range(1000):
-        _, _, calculated_values = DensityGERG_numba(AR, Press, Temp, b, iFlag=0)  # Calling the function without any argument
+        _, _, calculated_values = DensityGERG_numba(
+            AR, Press, Temp, b, iFlag=0
+        )  # Calling the function without any argument
     end_time = timer()
     function_time = end_time - start_time
     print(f"For 100 iterations, DensityGERG_numba took {function_time:.6f} seconds.")
@@ -216,16 +446,58 @@ def speed_density_gerg():
 
 def speed_alpha0_gerg():
     """
-        Speed Check the numba version of the Alpha0GERG() function of GasMixtureGERG2008 class.
+    Speed Check the numba version of the Alpha0GERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
@@ -260,16 +532,58 @@ def speed_alpha0_gerg():
 
 def speed_reducing_parameters_gerg():
     """
-        Speed check the numba version of the ReducingParametersGERG() function of GasMixtureGERG2008 class.
+    Speed check the numba version of the ReducingParametersGERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015,
-                  0.00009, 0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
@@ -283,7 +597,9 @@ def speed_reducing_parameters_gerg():
         expected_reducingparametersgerg = gas_mixture.ReducingParametersGERG()
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For 100 iterations, ReducingParametersGERG took {function_time:.6f} seconds.")
+    print(
+        f"For 100 iterations, ReducingParametersGERG took {function_time:.6f} seconds."
+    )
 
     # Call the ReducingParametersGERG function
     # Tr - Reducing temperature(K)
@@ -294,21 +610,65 @@ def speed_reducing_parameters_gerg():
         actual_reducingparametersgerg = ReducingParametersGERG_numba(b)
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For 100 iterations, ReducingParametersGERG_numba took {function_time:.6f} seconds.")
+    print(
+        f"For 100 iterations, ReducingParametersGERG_numba took {function_time:.6f} seconds."
+    )
 
 
 def speed_pseudo_critical_point_gerg():
     """
-            Speed check the numba version of the PseudoCriticalPointGERG() function of GasMixtureGERG2008 class.
+    Speed check the numba version of the PseudoCriticalPointGERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015,
-                  0.00009, 0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
@@ -322,7 +682,9 @@ def speed_pseudo_critical_point_gerg():
         expected_pseudocriticalpointgerg = gas_mixture.PseudoCriticalPointGERG()
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For 100 iterations, PseudoCriticalPointGERG took {function_time:.6f} seconds.")
+    print(
+        f"For 100 iterations, PseudoCriticalPointGERG took {function_time:.6f} seconds."
+    )
 
     # Call the ReducingParametersGERG function
     # Measure the execution time
@@ -331,7 +693,10 @@ def speed_pseudo_critical_point_gerg():
         actual_pseudocriticalpointgerg = PseudoCriticalPointGERG_numba(b)
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For 100 iterations, PseudoCriticalPointGERG_numba took {function_time:.6f} seconds.")
+    print(
+        f"For 100 iterations, PseudoCriticalPointGERG_numba took {function_time:.6f} seconds."
+    )
+
 
 def wrapper_function(args):
     PropertiesGERG_numba(*args)
@@ -340,23 +705,69 @@ def wrapper_function(args):
 
 def speed_alphar_gerg(repeats=10000):
     """
-            Speed check the numba version of the AlpharGERG() function of GasMixtureGERG2008 class.
+    Speed check the numba version of the AlpharGERG() function of GasMixtureGERG2008 class.
     """
     # Create the NIST gas mixture dictionary
     nist_gas_mixture = {}
-    a = ['methane', 'nitrogen', 'carbon dioxide', 'ethane', 'propane', 'isobutane',
-         'butane', 'isopentane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane',
-         'decane', 'hydrogen', 'oxygen', 'carbon monoxide', 'water', 'hydrogen sulfide',
-         'helium', 'argon']
-    b = np.array([0.77824, 0.02, 0.06, 0.08, 0.03, 0.0015, 0.003, 0.0005, 0.00165, 0.00215, 0.00088, 0.00024, 0.00015, 0.00009,
-         0.004, 0.005, 0.002, 0.0001, 0.0025, 0.007, 0.001])
+    a = [
+        "methane",
+        "nitrogen",
+        "carbon dioxide",
+        "ethane",
+        "propane",
+        "isobutane",
+        "butane",
+        "isopentane",
+        "pentane",
+        "hexane",
+        "heptane",
+        "octane",
+        "nonane",
+        "decane",
+        "hydrogen",
+        "oxygen",
+        "carbon monoxide",
+        "water",
+        "hydrogen sulfide",
+        "helium",
+        "argon",
+    ]
+    b = np.array(
+        [
+            0.77824,
+            0.02,
+            0.06,
+            0.08,
+            0.03,
+            0.0015,
+            0.003,
+            0.0005,
+            0.00165,
+            0.00215,
+            0.00088,
+            0.00024,
+            0.00015,
+            0.00009,
+            0.004,
+            0.005,
+            0.002,
+            0.0001,
+            0.0025,
+            0.007,
+            0.001,
+        ]
+    )
     for ii in range(21):
         nist_gas_mixture[a[ii]] = b[ii]
 
-    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
+    nist_gas_mixture_gerg2008_composition = convert_to_gerg2008_composition(
+        nist_gas_mixture
+    )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False)
+    gas_mixture = GasMixtureGERG2008(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    )
 
     # Expected value calculated from the function call
     #                         ar(0,0) - Residual Helmholtz energy (dimensionless, =a/RT)
@@ -384,8 +795,9 @@ def speed_alphar_gerg(repeats=10000):
         AlpharGERG_numba(Temp, b, 1, 0, D)
     end_time = timer()
     function_time = end_time - start_time
-    print(f"For {repeats} iterations, AlpharGERG_numba took {function_time:.6f} seconds.")
-
+    print(
+        f"For {repeats} iterations, AlpharGERG_numba took {function_time:.6f} seconds."
+    )
 
     # arguments = [(Temp, b, 1, 0, D) for _ in range(repeats)]
     #

@@ -1,9 +1,9 @@
 #   #!/usr/bin/env python
 #   -*- coding: utf-8 -*-
 #   ******************************************************************************
-#     Copyright (c) 2024.
+#     Copyright (c) 2025.
 #     Developed by Yifei Lu
-#     Last change on 8/18/24, 4:56 PM
+#     Last change on 1/6/25, 3:43 PM
 #     Last change by yifei
 #    *****************************************************************************
 
@@ -96,16 +96,7 @@
 # static void tTermsGERG(const double lntau, const std::vector<double> &x);
 # """
 from collections import OrderedDict
-
-#   #!/usr/bin/env python
-#   -*- coding: utf-8 -*-
-#   ******************************************************************************
-#     Copyright (c) 2022.
-#     Developed by Yifei Lu
-#     Last change on 4/3/22, 1:38 PM
-#     Last change by yifei
-#    *****************************************************************************
-
+from scipy.constants import zero_Celsius
 import numpy as np
 import math
 from collections import Counter
@@ -130,14 +121,14 @@ def Cosh(xx):
 
 def convert_to_gerg2008_composition(composition: OrderedDict) -> np.array:
     """
-        Converts a dictionary representing gas compositions into a GERG composition list.
-        https://numba.readthedocs.io/en/stable/reference/pysupported.html#typed-dict
+    Converts a dictionary representing gas compositions into a GERG composition list.
+    https://numba.readthedocs.io/en/stable/reference/pysupported.html#typed-dict
 
-        Inputs:
-            composition (dict): A dictionary containing gas species and their compositions.
+    Inputs:
+        composition (dict): A dictionary containing gas species and their compositions.
 
-        return:
-            gerg_composition (list): A list representing the GERG composition of gases.
+    return:
+        gerg_composition (list): A list representing the GERG composition of gases.
     """
     gerg_composition = np.zeros(21)
     global gerg_gas_spices
@@ -152,37 +143,39 @@ def convert_gerg2008_to_dictionary(gerg2008_composition: np.array) -> OrderedDic
     assert gerg2008_composition.shape == (21,), "Check the GERG-2008 composition array"
     global gerg_gas_spices
 
-    gas_mixutre_composition = OrderedDict()
+    gas_mixture_composition = OrderedDict()
 
     for _i in range(21):
         if gerg2008_composition[_i] > 0:
-            gas_mixutre_composition[gerg_gas_spices[_i]] = gerg2008_composition[_i]
+            gas_mixture_composition[gerg_gas_spices[_i]] = gerg2008_composition[_i]
 
-    return gas_mixutre_composition
+    return gas_mixture_composition
 
 
 def gerg2008_gas_compounds_atomic_composition() -> np.array(21):
-    dict_components = {'methane': {'C': 1, 'H': 4},
-                       'nitrogen': {'N': 2},
-                       'carbon dioxide': {'C': 1, 'O': 2},
-                       'ethane': {'C': 2, 'H': 6},
-                       'propane': {'C': 3, 'H': 8},
-                       'isobutane': {'C': 4, 'H': 10},
-                       'n-butane': {'C': 4, 'H': 10},
-                       'isopentane': {'C': 5, 'H': 12},
-                       'n-pentane': {'C': 5, 'H': 12},
-                       'n-hexane': {'C': 6, 'H': 14},
-                       'n-heptane': {'C': 7, 'H': 16},
-                       'n-octane': {'C': 8, 'H': 18},
-                       'n-nonane': {'C': 9, 'H': 20},
-                       'n-decane': {'C': 10, 'H': 22},
-                       'hydrogen': {'H': 2},
-                       'oxygen': {'O': 2},
-                       'carbon monoxide': {'C': 1, 'O': 1},
-                       'water': {'H': 2, 'O': 1},
-                       'hydrogen sulfide': {'H': 2, 'S': 1},
-                       'helium': {'He': 1},
-                       'argon': {'Ar': 1}}
+    dict_components = {
+        "methane": {"C": 1, "H": 4},
+        "nitrogen": {"N": 2},
+        "carbon dioxide": {"C": 1, "O": 2},
+        "ethane": {"C": 2, "H": 6},
+        "propane": {"C": 3, "H": 8},
+        "isobutane": {"C": 4, "H": 10},
+        "n-butane": {"C": 4, "H": 10},
+        "isopentane": {"C": 5, "H": 12},
+        "n-pentane": {"C": 5, "H": 12},
+        "n-hexane": {"C": 6, "H": 14},
+        "n-heptane": {"C": 7, "H": 16},
+        "n-octane": {"C": 8, "H": 18},
+        "n-nonane": {"C": 9, "H": 20},
+        "n-decane": {"C": 10, "H": 22},
+        "hydrogen": {"H": 2},
+        "oxygen": {"O": 2},
+        "carbon monoxide": {"C": 1, "O": 1},
+        "water": {"H": 2, "O": 1},
+        "hydrogen sulfide": {"H": 2, "S": 1},
+        "helium": {"He": 1},
+        "argon": {"Ar": 1},
+    }
 
     # Determine all unique elements
     elements = set()
@@ -207,28 +200,32 @@ def gerg2008_gas_compounds_atomic_composition() -> np.array(21):
 
     return data
 
-number_of_atoms = np.array([[0, 1, 4, 0, 0, 0, 0],
-                            [0, 0, 0, 0, 2, 0, 0],
-                            [0, 1, 0, 0, 0, 2, 0],
-                            [0, 2, 6, 0, 0, 0, 0],
-                            [0, 3, 8, 0, 0, 0, 0],
-                            [0, 4, 10, 0, 0, 0, 0],
-                            [0, 4, 10, 0, 0, 0, 0],
-                            [0, 5, 12, 0, 0, 0, 0],
-                            [0, 5, 12, 0, 0, 0, 0],
-                            [0, 6, 14, 0, 0, 0, 0],
-                            [0, 7, 16, 0, 0, 0, 0],
-                            [0, 8, 18, 0, 0, 0, 0],
-                            [0, 9, 20, 0, 0, 0, 0],
-                            [0,10, 22, 0, 0, 0, 0],
-                            [0, 0, 2, 0, 0, 0, 0],
-                            [0, 0, 0, 0, 0, 2, 0],
-                            [0, 1, 0, 0, 0, 1, 0],
-                            [0, 0, 2, 0, 0, 1, 0],
-                            [0, 0, 2, 0, 0, 0, 1],
-                            [0, 0, 0, 1, 0, 0, 0],
-                            [1, 0, 0, 0, 0, 0, 0]])
 
+number_of_atoms = np.array(
+    [
+        [0, 1, 4, 0, 0, 0, 0],
+        [0, 0, 0, 0, 2, 0, 0],
+        [0, 1, 0, 0, 0, 2, 0],
+        [0, 2, 6, 0, 0, 0, 0],
+        [0, 3, 8, 0, 0, 0, 0],
+        [0, 4, 10, 0, 0, 0, 0],
+        [0, 4, 10, 0, 0, 0, 0],
+        [0, 5, 12, 0, 0, 0, 0],
+        [0, 5, 12, 0, 0, 0, 0],
+        [0, 6, 14, 0, 0, 0, 0],
+        [0, 7, 16, 0, 0, 0, 0],
+        [0, 8, 18, 0, 0, 0, 0],
+        [0, 9, 20, 0, 0, 0, 0],
+        [0, 10, 22, 0, 0, 0, 0],
+        [0, 0, 2, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 0, 1, 0],
+        [0, 0, 2, 0, 0, 1, 0],
+        [0, 0, 2, 0, 0, 0, 1],
+        [0, 0, 0, 1, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
+    ]
+)
 
 """
 The compositions in the x() array use the following order and must be sent as mole fractions:
@@ -257,20 +254,31 @@ The compositions in the x() array use the following order and must be sent as mo
 
 
 class GasMixtureGERG2008:
-    def __init__(self, P_Pa: float, T_K: float, composition: np.array, use_numba: bool=True):
+    def __init__(
+        self,
+        P_Pa: float,
+        T_K: float,
+        composition: np.array,
+        use_numba: bool = True,
+        T_ref_dens_degreeC: float = 0.0,
+        T_ref_comb_degreeC: float = 25.0,
+    ):
         # Input parameters
         self.dPdT = None
         self.d2PdD2 = None
         self.dPdD = None
-        self.P = P_Pa / 1000  # Pa -> kPa
+        self.P = P_Pa / 1000.0  # Pa -> kPa
 
         self.T = T_K
+
+        self.ref_temp_props_K = T_ref_dens_degreeC + zero_Celsius
+        self.ref_temp_comb_water_C = T_ref_comb_degreeC
 
         if use_numba:
             # from .gerg2008_numba import ConvertCompositionGERG_numba
             self.x = composition  # gas composition
         else:
-            self.x = np.insert(composition, 0, 0) # gas composition
+            self.x = np.insert(composition, 0, 0)  # gas composition
 
         # # Calculated properties
         # self.MolarMass = self.MolarMassGERG()
@@ -296,15 +304,21 @@ class GasMixtureGERG2008:
         # self.viscosity = 2e-4  # TODO add function
 
         if use_numba:
-            from .gerg2008_numba import PropertiesGERG_numba, CalculateHeatingValue_numba
+            from .gerg2008_numba import (
+                PropertiesGERG_numba,
+                CalculateHeatingValue_numba,
+            )
+
             properties = PropertiesGERG_numba(T=self.T, P=self.P, x=self.x)
             self.MolarMass = properties[0]
             # self.MolarDensity = self.DensityGERG(iFlag=0)[2]
             self.MolarDensity = properties[1]
             self.rho = properties[17]  # kg/m3
-            self.standard_density = self.rho * self.T / self.P / 1e3 * atm / 288.15  # TODO: define global constants
             self.SG = properties[18]
             self.Z = properties[2]
+            self.standard_density = (
+                self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K * self.Z
+            )  # TODO: define global constants
             self.dPdD = properties[3]
             self.d2PdD2 = properties[4]
             self.dPdT = properties[5]
@@ -322,33 +336,94 @@ class GasMixtureGERG2008:
             self.isentropic_exponent = properties[16]  # Isentropic exponent
 
             self.R_specific = properties[19]
-            self.viscosity = 2e-5  # TODO add function
 
-            self.HHV_J_per_m3 = CalculateHeatingValue_numba(MolarMass=self.MolarMass,
-                                                            MolarDensity=self.MolarDensity,
-                                                            comp=composition, hhv=True, parameter="volume")
-            self.HHV_J_per_sm3 = self.HHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
-            self.HHV_J_per_kg = CalculateHeatingValue_numba(MolarMass=self.MolarMass,
-                                                            MolarDensity=self.MolarDensity,
-                                                            comp=composition, hhv=True, parameter="mass")
-            self.LHV_J_per_m3 = CalculateHeatingValue_numba(MolarMass=self.MolarMass,
-                                                            MolarDensity=self.MolarDensity,
-                                                            comp=composition, hhv=False, parameter="volume")
-            self.LHV_J_per_sm3 = self.LHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
-            self.LHV_J_per_kg = CalculateHeatingValue_numba(MolarMass=self.MolarMass,
-                                                            MolarDensity=self.MolarDensity,
-                                                            comp=composition, hhv=False, parameter="mass")
+            self.HHV_J_per_m3 = CalculateHeatingValue_numba(
+                MolarMass=self.MolarMass,
+                MolarDensity=self.MolarDensity,
+                comp=composition,
+                hhv=True,
+                per_mass=False,
+                reference_temp=self.ref_temp_comb_water_C,
+            )
+            self.HHV_J_per_sm3 = (
+                self.HHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.ref_temp_props_K
+                * self.T
+                * self.Z
+            )
+            self.HHV_J_per_kg = CalculateHeatingValue_numba(
+                MolarMass=self.MolarMass,
+                MolarDensity=self.MolarDensity,
+                comp=composition,
+                hhv=True,
+                per_mass=True,
+                reference_temp=self.ref_temp_comb_water_C,
+            )
+            self.LHV_J_per_m3 = CalculateHeatingValue_numba(
+                MolarMass=self.MolarMass,
+                MolarDensity=self.MolarDensity,
+                comp=composition,
+                hhv=False,
+                per_mass=False,
+                reference_temp=self.ref_temp_comb_water_C,
+            )
+            self.LHV_J_per_sm3 = (
+                self.LHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.ref_temp_props_K
+                * self.T
+                * self.Z
+            )
+            self.LHV_J_per_kg = CalculateHeatingValue_numba(
+                MolarMass=self.MolarMass,
+                MolarDensity=self.MolarDensity,
+                comp=composition,
+                hhv=False,
+                per_mass=True,
+                reference_temp=self.ref_temp_comb_water_C,
+            )
 
         else:
             self.PropertiesGERG()
-            self.standard_density = self.rho * self.T / self.P / 1e3 * atm / 288.15  # TODO: define global constants
+            self.standard_density = (
+                self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K
+            )  # TODO: define global constants
 
-            self.HHV_J_per_m3 = self.CalculateHeatingValue(comp=composition, hhv=True, parameter="volume")
-            self.HHV_J_per_sm3 = self.HHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
-            self.HHV_J_per_kg = self.CalculateHeatingValue(comp=composition, hhv=True, parameter="mass")
-            self.LHV_J_per_m3 = self.CalculateHeatingValue(comp=composition, hhv=False, parameter="volume")
-            self.LHV_J_per_sm3 = self.LHV_J_per_m3 / self.P / 1000 * atm / 288.15 * self.T
-            self.LHV_J_per_kg = self.CalculateHeatingValue(comp=composition, hhv=False, parameter="mass")
+            self.HHV_J_per_m3 = self.CalculateHeatingValue(
+                comp=composition, hhv=True, parameter="volume"
+            )
+            self.HHV_J_per_sm3 = (
+                self.HHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.ref_temp_props_K
+                * self.T
+                * self.Z
+            )
+            self.HHV_J_per_kg = self.CalculateHeatingValue(
+                comp=composition, hhv=True, parameter="mass"
+            )
+            self.LHV_J_per_m3 = self.CalculateHeatingValue(
+                comp=composition, hhv=False, parameter="volume"
+            )
+            self.LHV_J_per_sm3 = (
+                self.LHV_J_per_m3
+                / self.P
+                / 1000
+                * atm
+                / self.ref_temp_props_K
+                * self.T
+                * self.Z
+            )
+            self.LHV_J_per_kg = self.CalculateHeatingValue(
+                comp=composition, hhv=False, parameter="mass"
+            )
 
     def CalculateHeatingValue(self, comp, hhv, parameter):
         # 298 K
@@ -379,32 +454,35 @@ class GasMixtureGERG2008:
         #                       # 'SO2': -296840.0}
 
         # 273 K
-        enthalpy_mole = np.array([-75483.51423273719,  # methane
-                                  0.0, # nitrogen
-                                  -394431.82606764464,  # carbon dioxide
-                                  -83856.2627150042,  # ethane
-                                  -103861.117481869,  # propane
-                                  -135360.0,  # isobutane
-                                  -125849.99999999999,  # n-butane
-                                  -178400.0,  # isopentane
-                                  -173500.0,  # n-pentane
-                                  -198490.0,  # n-hexane
-                                  -223910.0,  # n-heptane
-                                  -249730.0,  # n-octane
-                                  -274700.0,  # n-nonane
-                                  -300900.0,  # n-decane
-                                  0.0,  # hydrogen
-                                  -4.40676212751828,  # oxygen
-                                  -111262.34509634285,  # carbon monoxide
-                                  -242671.7203547155,  # water
-                                  -20600.0,  # hydrogen sulfide
-                                  0.0,  # helium
-                                  0.0,  # argon
-                                  -296840.0])  # sulfur dioxide
+        enthalpy_mole = np.array(
+            [
+                -75483.51423273719,  # methane
+                0.0,  # nitrogen
+                -394431.82606764464,  # carbon dioxide
+                -83856.2627150042,  # ethane
+                -103861.117481869,  # propane
+                -135360.0,  # isobutane
+                -125849.99999999999,  # n-butane
+                -178400.0,  # isopentane
+                -173500.0,  # n-pentane
+                -198490.0,  # n-hexane
+                -223910.0,  # n-heptane
+                -249730.0,  # n-octane
+                -274700.0,  # n-nonane
+                -300900.0,  # n-decane
+                0.0,  # hydrogen
+                -4.40676212751828,  # oxygen
+                -111262.34509634285,  # carbon monoxide
+                -242671.7203547155,  # water
+                -20600.0,  # hydrogen sulfide
+                0.0,  # helium
+                0.0,  # argon
+                -296840.0,
+            ]
+        )  # sulfur dioxide
 
         atom_list = number_of_atoms * comp[:, np.newaxis]
         reactants_atom = np.sum(atom_list, axis=0)
-
 
         # products
         n_CO2 = reactants_atom[1]  # C
@@ -413,18 +491,22 @@ class GasMixtureGERG2008:
         products_dict = np.array([n_CO2, n_SO2, n_H2O])
 
         # oxygen for complete combustion
-        n_O = n_CO2 * 2 + n_SO2 * 2 + n_H2O * 1  # 2 is number of O atoms in CO2 AND SO2 and 1 is number of O atoms in H2O
+        n_O = (
+            n_CO2 * 2 + n_SO2 * 2 + n_H2O * 1
+        )  # 2 is number of O atoms in CO2 AND SO2 and 1 is number of O atoms in H2O
         n_O2 = n_O / 2
         reactants_dict = np.copy(comp)
         reactants_dict[15] += n_O2
         # reactants_dict.update({'oxygen': n_O2})
 
         # LHV calculation
-        LHV = (reactants_dict * enthalpy_mole[:-1]).sum() - (products_dict * enthalpy_mole[[2, 21, 17]]).sum()
+        LHV = (reactants_dict * enthalpy_mole[:-1]).sum() - (
+            products_dict * enthalpy_mole[[2, 21, 17]]
+        ).sum()
 
-        # 298 K
-        hw_liq = -285825.0
-        hw_gas = -241820.0
+        # 298.15 K
+        hw_liq = -285839.09854950657
+        hw_gas = -241824.62162536496
 
         # 273 K
         # hw_liq = -287654.96084928664
@@ -432,7 +514,7 @@ class GasMixtureGERG2008:
 
         HHV = LHV + (hw_gas - hw_liq) * products_dict[2]
 
-        if parameter == 'mass':
+        if parameter == "mass":
             # returns heating value in J/kg
             if hhv:
                 heating_value = HHV / self.MolarMass * 1e3
@@ -466,7 +548,7 @@ class GasMixtureGERG2008:
         :return: Mm:  Molar mass (g/mol)
         """
         Mm = 0
-        for i in range(1, NcGERG+1):
+        for i in range(1, NcGERG + 1):
             Mm += self.x[i] * MMiGERG[i]
         return Mm
 
@@ -540,18 +622,25 @@ class GasMixtureGERG2008:
         tolr = 0.0000001
         Tcx, Dcx = self.PseudoCriticalPointGERG()
 
-        if D > - epsilon:
-            D = self.P / RGERG / self.T                # Ideal gas estimate for vapor phase
+        if D > -epsilon:
+            D = self.P / RGERG / self.T  # Ideal gas estimate for vapor phase
             if iFlag == 2:
-                D = Dcx*3    # Initial estimate for liquid phase
+                D = Dcx * 3  # Initial estimate for liquid phase
 
         else:
-            D = abs(D)                  # If D<0, then use as initial estimate
+            D = abs(D)  # If D<0, then use as initial estimate
 
         plog = math.log(self.P)
         vlog = -math.log(D)
         for it in range(1, 51):
-            if (vlog < -7) or (vlog > 100) or (it == 20) or (it == 30) or (it == 40) or (iFail == 1):
+            if (
+                (vlog < -7)
+                or (vlog > 100)
+                or (it == 20)
+                or (it == 30)
+                or (it == 40)
+                or (iFail == 1)
+            ):
                 # Current state is bad or iteration is taking too long.  Restart with completely different initial state
                 iFail = 0
                 if nFail > 2:
@@ -561,9 +650,13 @@ class GasMixtureGERG2008:
                     D = P / RGERG / T
                 nFail += 1
                 if nFail == 1:
-                    D = Dcx * 3  # If vapor phase search fails, look for root in liquid region
+                    D = (
+                        Dcx * 3
+                    )  # If vapor phase search fails, look for root in liquid region
                 elif nFail == 2:
-                    D = Dcx * 2.5  # If liquid phase search fails, look for root between liquid and critical regions
+                    D = (
+                        Dcx * 2.5
+                    )  # If liquid phase search fails, look for root between liquid and critical regions
                 elif nFail == 3:
                     D = Dcx * 2  # If search fails, look for root in critical region
 
@@ -584,9 +677,9 @@ class GasMixtureGERG2008:
                 # Find the next density with a first order Newton's type iterative scheme, with
                 # log(P) as the known variable and log(v) as the unknown property.
                 # See AGA 8 publication for further information.
-                dpdlv = -D * dPdDsave     # d(p)/d[log(v)]
+                dpdlv = -D * dPdDsave  # d(p)/d[log(v)]
                 vdiff = (math.log(P2) - plog) * P2 / dpdlv
-                vlog += - vdiff
+                vlog += -vdiff
                 if abs(vdiff) < tolr:
                     # Check to see if state is possibly 2-phase, and if so restart
                     if dPdDsave < 0:
@@ -597,16 +690,20 @@ class GasMixtureGERG2008:
                         # If requested, check to see if point is possibly 2-phase
                         if iFlag > 0:
                             self.PropertiesGERG()
-                            if ((PP <= 0) or (dPdD <= 0) or (d2PdTD <= 0)) or ((Cv <= 0) or (Cp <= 0) or (W <= 0)):
+                            if ((PP <= 0) or (dPdD <= 0) or (d2PdTD <= 0)) or (
+                                (Cv <= 0) or (Cp <= 0) or (W <= 0)
+                            ):
                                 # Iteration failed (above loop did find a solution or checks made below indicate possible 2-phase state)
                                 ierr = 1
                                 herr = "Calculation failed to converge in GERG method, ideal gas density returned."
                                 D = P / RGERG / T
                             return ierr, herr, D
-                        return ierr, herr, D              # Iteration converged
+                        return ierr, herr, D  # Iteration converged
         # Iteration failed (above loop did not find a solution or checks made below indicate possible 2-phase state)
         ierr = 1
-        herr = "Calculation failed to converge in GERG method, ideal gas density returned."
+        herr = (
+            "Calculation failed to converge in GERG method, ideal gas density returned."
+        )
         D = P / RGERG / T
         return ierr, herr, D
 
@@ -674,11 +771,13 @@ class GasMixtureGERG2008:
         if D > epsilon:
             Cp = Cv + T * (dPdT / D) * (dPdT / D) / dPdD
             d2PdD2 = RT * (2 * ar[0][1] + 4 * ar[0][2] + ar[0][3]) / D
-            JT = (T / D * dPdT / dPdD - 1) / Cp / D  #  '=(dB/dT*T-B)/Cp for an ideal gas, but dB/dT is not known
+            JT = (
+                (T / D * dPdT / dPdD - 1) / Cp / D
+            )  # '=(dB/dT*T-B)/Cp for an ideal gas, but dB/dT is not known
         else:
             Cp = Cv + R
             d2PdD2 = 0
-            JT = 1E+20
+            JT = 1e20
         W = 1000 * Cp / Cv * dPdD / molar_mass
         if W < 0:
             W = 0
@@ -702,7 +801,7 @@ class GasMixtureGERG2008:
         self.gibbs_energy = G  # Gibbs energy [J/mol]
         self.JT = JT / 1e3  # Joule-Thomson coefficient [K/Pa]
         self.isentropic_exponent = Kappa  # Isentropic exponent
-        self.rho = self.MolarMass * self.P / Z /RT  # density [kg/m3]
+        self.rho = self.MolarMass * self.P / Z / RT  # density [kg/m3]
         self.SG = self.MolarMass / air_molar_mass
         self.R_specific = R / self.MolarMass
 
@@ -760,7 +859,9 @@ class GasMixtureGERG2008:
                         SumHyp1 = SumHyp1 - n0i[i][j] * th0T * hsn / hcn
                         SumHyp2 = SumHyp2 + n0i[i][j] * (th0T / hcn) * (th0T / hcn)
 
-            a0[0] += +x[i] * (LogxD + n0i[i][1] + n0i[i][2] / T - n0i[i][3] * LogT + SumHyp0)
+            a0[0] += +x[i] * (
+                LogxD + n0i[i][1] + n0i[i][2] / T - n0i[i][3] * LogT + SumHyp0
+            )
             a0[1] += +x[i] * (n0i[i][3] + n0i[i][2] / T + SumHyp1)
             a0[2] += -x[i] * (n0i[i][3] + SumHyp2)
         return a0
@@ -787,7 +888,7 @@ class GasMixtureGERG2008:
 
         # Check to see if a component fraction has changed.  If x is the same as the previous call, then exit.
         icheck = 0
-        for i in range(1, NcGERG+1):
+        for i in range(1, NcGERG + 1):
             if abs(self.x[i] - xold[i]) > 0.0000001:
                 icheck = 1
             xold[i] = self.x[i]
@@ -800,14 +901,18 @@ class GasMixtureGERG2008:
         Dr = 0
         Vr = 0
         Tr = 0
-        for i in range(1, NcGERG+1):
+        for i in range(1, NcGERG + 1):
             if self.x[i] > epsilon:
                 F = 1
-                for j in range(i, NcGERG+1):
+                for j in range(i, NcGERG + 1):
                     if self.x[j] > epsilon:
                         xij = F * (self.x[i] * self.x[j]) * (self.x[i] + self.x[j])
-                        Vr = Vr + xij * gvij[i][j] / (bvij[i][j] * self.x[i] + self.x[j])
-                        Tr = Tr + xij * gtij[i][j] / (btij[i][j] * self.x[i] + self.x[j])
+                        Vr = Vr + xij * gvij[i][j] / (
+                            bvij[i][j] * self.x[i] + self.x[j]
+                        )
+                        Tr = Tr + xij * gtij[i][j] / (
+                            btij[i][j] * self.x[i] + self.x[j]
+                        )
                         F = 2
         if Vr > epsilon:
             Dr = 1 / Vr
@@ -842,8 +947,8 @@ class GasMixtureGERG2008:
         global Told, Trold, Trold2, Drold
 
         global Tr, Dr
-        delp = [0] * (7+1)
-        Expd = [0] * (7+1)
+        delp = [0] * (7 + 1)
+        Expd = [0] * (7 + 1)
         ar = [[0] * 4 for _ in range(4)]
 
         for i in range(4):
@@ -868,9 +973,9 @@ class GasMixtureGERG2008:
         Trold2 = Tr
 
         # Calculate pure fluid contributions
-        for i in range(1, NcGERG+1):
+        for i in range(1, NcGERG + 1):
             if x[i] > epsilon:
-                for k in range(1, int(kpol[i]+1)):
+                for k in range(1, int(kpol[i] + 1)):
                     ndt = x[i] * delp[int(doik[i][k])] * taup[i][k]
                     ndtd = ndt * doik[i][k]
                     ar[0][1] += ndtd
@@ -883,8 +988,13 @@ class GasMixtureGERG2008:
                         ar[1][1] += ndtt * doik[i][k]
                         ar[1][2] += ndtt * doik[i][k] * (doik[i][k] - 1)
                         ar[0][3] += ndtd * (doik[i][k] - 1) * (doik[i][k] - 2)
-                for k in range(int(kpol[i]+1), int(kpol[i] + kexp[i]+1)):
-                    ndt = x[i] * delp[int(doik[i][k])] * taup[i][k]*Expd[int(coik[i][k])]
+                for k in range(int(kpol[i] + 1), int(kpol[i] + kexp[i] + 1)):
+                    ndt = (
+                        x[i]
+                        * delp[int(doik[i][k])]
+                        * taup[i][k]
+                        * Expd[int(coik[i][k])]
+                    )
                     ex = coik[i][k] * delp[int(coik[i][k])]
                     ex2 = doik[i][k] - ex
                     ex3 = ex2 * (ex2 - 1)
@@ -897,17 +1007,24 @@ class GasMixtureGERG2008:
                         ar[2][0] += ndtt * (toik[i][k] - 1)
                         ar[1][1] += ndtt * ex2
                         ar[1][2] += ndtt * (ex3 - coik[i][k] * ex)
-                        ar[0][3] += ndt * (ex3 * (ex2 - 2) - ex * (3 * ex2 - 3 + coik[i][k]) * coik[i][k])
+                        ar[0][3] += ndt * (
+                            ex3 * (ex2 - 2)
+                            - ex * (3 * ex2 - 3 + coik[i][k]) * coik[i][k]
+                        )
 
         # Calculate mixture contributions
         for i in range(1, NcGERG):  # for (int i = 1; i <= NcGERG - 1; ++i)
             if x[i] > epsilon:
-                for j in range(i+1, NcGERG+1):  # for (int j = i + 1; j <= NcGERG; ++j)
+                for j in range(
+                    i + 1, NcGERG + 1
+                ):  # for (int j = i + 1; j <= NcGERG; ++j)
                     if x[j] > epsilon:
                         mn = int(mNumb[i][j])
                         if mn >= 0:
                             xijf = x[i] * x[j] * fij[i][j]
-                            for k in range(1, int(kpolij[mn] + 1)):  # for (int k = 1; k <= kpolij[mn]; ++k)
+                            for k in range(
+                                1, int(kpolij[mn] + 1)
+                            ):  # for (int k = 1; k <= kpolij[mn]; ++k)
                                 ndt = xijf * delp[int(dijk[mn][k])] * taupijk[mn][k]
                                 ndtd = ndt * dijk[mn][k]
                                 ar[0][1] += ndtd
@@ -919,14 +1036,25 @@ class GasMixtureGERG2008:
                                     ar[2][0] += ndtt * (tijk[mn][k] - 1)
                                     ar[1][1] += ndtt * dijk[mn][k]
                                     ar[1][2] += ndtt * dijk[mn][k] * (dijk[mn][k] - 1)
-                                    ar[0][3] += ndtd * (dijk[mn][k] - 1) * (dijk[mn][k] - 2)
+                                    ar[0][3] += (
+                                        ndtd * (dijk[mn][k] - 1) * (dijk[mn][k] - 2)
+                                    )
 
-                            for k in range(int(1+kpolij[mn]), int(kpolij[mn]+kexpij[mn]+1)):  # for (int k = 1 + kpolij[mn]; k <= kpolij[mn] + kexpij[mn]; ++k)
+                            for k in range(
+                                int(1 + kpolij[mn]), int(kpolij[mn] + kexpij[mn] + 1)
+                            ):  # for (int k = 1 + kpolij[mn]; k <= kpolij[mn] + kexpij[mn]; ++k)
                                 cij0 = cijk[mn][k] * delp[2]
                                 eij0 = eijk[mn][k] * delta
-                                ndt = xijf * nijk[mn][k] * delp[int(dijk[mn][k])] * math.exp(cij0 + eij0 + gijk[mn][k] + tijk[mn][k] * lntau)
+                                ndt = (
+                                    xijf
+                                    * nijk[mn][k]
+                                    * delp[int(dijk[mn][k])]
+                                    * math.exp(
+                                        cij0 + eij0 + gijk[mn][k] + tijk[mn][k] * lntau
+                                    )
+                                )
                                 ex = dijk[mn][k] + 2 * cij0 + eij0
-                                ex2 = (ex * ex - dijk[mn][k] + 2 * cij0)
+                                ex2 = ex * ex - dijk[mn][k] + 2 * cij0
                                 ar[0][1] += ndt * ex
                                 ar[0][2] += ndt * ex2
                                 if itau > 0:
@@ -936,9 +1064,11 @@ class GasMixtureGERG2008:
                                     ar[2][0] += ndtt * (tijk[mn][k] - 1)
                                     ar[1][1] += ndtt * ex
                                     ar[1][2] += ndtt * ex2
-                                    ar[0][3] += ndt * (ex * (ex2 - 2 * (dijk[mn][k] - 2 * cij0)) + 2 * dijk[mn][k])
+                                    ar[0][3] += ndt * (
+                                        ex * (ex2 - 2 * (dijk[mn][k] - 2 * cij0))
+                                        + 2 * dijk[mn][k]
+                                    )
         return ar
-
 
     def tTermsGERG(self, lntau, x):
         """
@@ -949,28 +1079,40 @@ class GasMixtureGERG2008:
         :param x:
         :return:
         """
-        taup0 = [0] * (12+1)
+        taup0 = [0] * (12 + 1)
 
         i = 5  # Use propane to get exponents for short form of EOS
-        for k in range(1, int(kpol[i] + kexp[i] + 1)):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+        for k in range(
+            1, int(kpol[i] + kexp[i] + 1)
+        ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
             taup0[k] = math.exp(toik[i][k] * lntau)
-        for i in range(1, NcGERG+1):  # for (int i = 1; i <= NcGERG; ++i)
+        for i in range(1, NcGERG + 1):  # for (int i = 1; i <= NcGERG; ++i)
             if x[i] > epsilon:
                 if (i > 4) and (i != 15) and (i != 18) and (i != 20):
-                    for k in range(1, int(kpol[i]+kexp[i]+1)):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+                    for k in range(
+                        1, int(kpol[i] + kexp[i] + 1)
+                    ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
                         taup[i][k] = noik[i][k] * taup0[k]
                 else:
-                    for k in range(1, int(kpol[i]+kexp[i]+1)):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+                    for k in range(
+                        1, int(kpol[i] + kexp[i] + 1)
+                    ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
                         taup[i][k] = noik[i][k] * math.exp(toik[i][k] * lntau)
 
         for i in range(1, NcGERG):  # for (int i = 1; i <= NcGERG - 1; ++i)
             if x[i] > epsilon:
-                for j in range(i+1, NcGERG+1):  # for (int j = i + 1; j <= NcGERG; ++j)
+                for j in range(
+                    i + 1, NcGERG + 1
+                ):  # for (int j = i + 1; j <= NcGERG; ++j)
                     if x[j] > epsilon:
                         mn = int(mNumb[i][j])
                         if mn >= 0:
-                            for k in range(1, int(kpolij[mn]+1)):  # for (int k = 1; k <= kpolij[mn]; ++k)
-                                taupijk[mn][k] = nijk[mn][k] * math.exp(tijk[mn][k] * lntau)
+                            for k in range(
+                                1, int(kpolij[mn] + 1)
+                            ):  # for (int k = 1; k <= kpolij[mn]; ++k)
+                                taupijk[mn][k] = nijk[mn][k] * math.exp(
+                                    tijk[mn][k] * lntau
+                                )
 
     def PseudoCriticalPointGERG(self):
         """
@@ -986,7 +1128,7 @@ class GasMixtureGERG2008:
         Tcx = 0
         Vcx = 0
         Dcx = 0
-        for i in range(1, NcGERG+1):  # for (int i = 1; i <= NcGERG; ++i)
+        for i in range(1, NcGERG + 1):  # for (int i = 1; i <= NcGERG; ++i)
             Tcx = Tcx + x[i] * Tc[i]
             Vcx = Vcx + x[i] / Dc[i]
         if Vcx > epsilon:
