@@ -1,12 +1,12 @@
 repos:
-  - repo: local
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # pin to a uv-pre-commit version
+    rev: 0.9.18
     hooks:
-      - id: export
-        name: Export requirements.txt from pyproject.toml
-        entry: poetry export -f requirements.txt --output requirements.txt --without-hashes
-        language: python
-        additional_dependencies:
-          - poetry>=1.8.2
-          - poetry-plugin-export
-        files: ^pyproject\.toml$
-        pass_filenames: false
+      - id: uv-lock
+      - id: uv-export
+        args: [
+          "--format", "requirements.txt",
+          "--output-file", "requirements.txt",
+          "--no-hashes"
+        ]

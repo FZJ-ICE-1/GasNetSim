@@ -7,21 +7,17 @@
 # https://hub.docker.com/r/library/python/tags/
 image: python:$PYTHON_VERSION  # Change image dynamically depending on Python version.
 
-# Change pip's cache directory to be inside the project directory since we can
-# only cache local items.
 variables:
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+  PRE_COMMIT_HOME: "$CI_PROJECT_DIR/.cache/pre-commit"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-# Pip's cache doesn't store the python packages
-# https://pip.pypa.io/en/stable/topics/caching/
-#
-# If you want to also cache the installed packages, you have to install
-# them in a virtualenv and cache it as well.
 cache:
   paths:
     - .cache/pip
     - .cache/pre-commit
-    - venv/
+    - .cache/uv
+    - .venv/
 
 stages:
   - pre-commit
@@ -33,40 +29,31 @@ pre-commit:
   stage: pre-commit
   image: python:3.12
   before_script:
-    - python -m pip install --upgrade pip
-    - curl -sSL https://install.python-poetry.org | python3 -
+    - python --version
+    # Install uv (standalone installer)
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
     - export PATH="$HOME/.local/bin:$PATH"
-    - poetry --version
-    - pip install pre-commit poetry-plugin-export
-    - export PATH="$HOME/.local/bin:$PATH"
-    - echo "PATH is $PATH"
-    - which poetry
-    - poetry --version
-    - poetry env use python3.12
+    - uv --version
+    # Create + sync env with dev/extra deps from the pyproject.toml file
+    # The dev tools are listed under [project.optional-dependencies] dev
+    - uv sync --all-extras
   script:
-    - export PATH="$HOME/.local/bin:$PATH"
-    - pre-commit run --all-files
-  cache:
-      paths:
-        - .cache/pip
-        - .local/share/pypoetry
-
+    - uv run pre-commit run --all-files
 
 # Define a template for testing with different Python versions
 .test_template: &test_template
   stage: test
   before_script:
     - python --version
-    - python -m pip install --upgrade pip
-    - pip install virtualenv
-
-    # Create and activate the virtual environment
-    - virtualenv venv
-    - source venv/bin/activate
-    - pip install poetry
-    - poetry install
+    # Install uv
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+    - uv --version
+    - uv sync --all-extras
   script:
-    - pytest -v --junitxml=reports/test-results/results.xml
+    - mkdir -p reports/test-results
+    - uv run pytest -v --junitxml=reports/test-results/results.xml
+
 #  artifacts:
 #    paths:
 #      - reports/test-results/
