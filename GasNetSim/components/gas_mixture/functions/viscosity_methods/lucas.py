@@ -26,7 +26,7 @@ class LucasViscosityCalculator(ViscosityCalculator):
         self.register_intermediate("Z2", self._calculate_Z2)
 
     @staticmethod
-    @njit(float64(float64, float64, float64, float64, float64))
+    @njit(float64(float64, float64, float64, float64, float64), cache=True, nogil=True)
     def _calculate_polarity_correction(T, Tc, Pc, Zc, mu):
         """Calculate Lucas method polarity correction factor (FP)
 
@@ -60,7 +60,7 @@ class LucasViscosityCalculator(ViscosityCalculator):
             return 1.0 + 30.55 * (0.292 - Zc) ** 1.72 * abs(0.96 + 0.1 * (Tr - 0.7))
 
     @staticmethod
-    @njit(float64(float64, float64, float64))
+    @njit(float64(float64, float64, float64), cache=True, nogil=True)
     def _calculate_quantum_correction(T, Tc, M):
         """Calculate Lucas method quantum correction factor (FQ)
 
@@ -90,7 +90,7 @@ class LucasViscosityCalculator(ViscosityCalculator):
         return 1.22 * Q ** 0.15 * (1 + 0.00385 * (Tr - 12) ** 2) ** (1 / M) * np.sign(Tr - 12)
 
     @staticmethod
-    @njit(float64(float64[:]))
+    @njit(float64(float64[:]), cache=True, nogil=True)
     def _calculate_mixture_factor(composition):
         """Calculate Lucas method mixture factor (A)
 
@@ -123,7 +123,7 @@ class LucasViscosityCalculator(ViscosityCalculator):
             return 1.0
 
     @staticmethod
-    @njit(float64(float64, float64, float64))
+    @njit(float64(float64, float64, float64), cache=True, nogil=True)
     def _calculate_Z1(Tr, FP_mix, FQ_mix):
         """Calculate Lucas method Z1 factor
 
@@ -145,7 +145,7 @@ class LucasViscosityCalculator(ViscosityCalculator):
                 0.340 * np.exp(-4.058 * Tr) + 0.018) * FP_mix * FQ_mix
 
     @staticmethod
-    @njit(float64(float64, float64, float64))
+    @njit(float64(float64, float64, float64), cache=True, nogil=True)
     def _calculate_Z2(Tr, Pr, Z1):
         """Calculate Lucas method Z2 factor
 
