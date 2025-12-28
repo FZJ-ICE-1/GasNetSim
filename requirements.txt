@@ -19,19 +19,17 @@ asttokens==3.0.1
     # via stack-data
 async-lru==2.0.5
     # via jupyterlab
-atomicwrites==1.4.1 ; sys_platform == 'win32'
-    # via pytest
 attrs==25.4.0
     # via
     #   jsonschema
-    #   pytest
     #   rasterio
     #   referencing
 babel==2.17.0
     # via jupyterlab-server
 beautifulsoup4==4.14.3
     # via nbconvert
-black==24.10.0
+black==25.11.0 ; python_full_version < '3.10'
+black==25.12.0 ; python_full_version >= '3.10'
 bleach==6.2.0 ; python_full_version < '3.10'
     # via nbconvert
 bleach==6.3.0 ; python_full_version >= '3.10'
@@ -86,7 +84,9 @@ comm==0.2.3
     # via
     #   ipykernel
     #   ipywidgets
-contextily==1.6.2
+contextily==1.6.2 ; python_full_version < '3.10'
+    # via gasnetsim
+contextily==1.7.0 ; python_full_version >= '3.10'
     # via gasnetsim
 contourpy==1.3.0 ; python_full_version < '3.10'
     # via matplotlib
@@ -110,15 +110,18 @@ exceptiongroup==1.3.1 ; python_full_version < '3.11'
     # via
     #   anyio
     #   ipython
+    #   pytest
 executing==2.2.1
     # via stack-data
 fastjsonschema==2.21.2
     # via nbformat
 filelock==3.19.1 ; python_full_version < '3.10'
     # via virtualenv
-filelock==3.20.0 ; python_full_version >= '3.10'
+filelock==3.20.1 ; python_full_version >= '3.10'
     # via virtualenv
-fonttools==4.60.1
+fonttools==4.60.2 ; python_full_version < '3.10'
+    # via matplotlib
+fonttools==4.61.1 ; python_full_version >= '3.10'
     # via matplotlib
 fqdn==1.5.1
     # via jsonschema
@@ -126,7 +129,7 @@ geographiclib==2.1
     # via geopy
 geopandas==1.0.1 ; python_full_version < '3.10'
     # via gasnetsim
-geopandas==1.1.1 ; python_full_version >= '3.10'
+geopandas==1.1.2 ; python_full_version >= '3.10'
     # via gasnetsim
 geopy==2.4.1
     # via contextily
@@ -144,7 +147,7 @@ idna==3.11
     #   httpx
     #   jsonschema
     #   requests
-importlib-metadata==8.7.0 ; python_full_version < '3.10'
+importlib-metadata==8.7.1 ; python_full_version < '3.10'
     # via
     #   jupyter-client
     #   jupyter-lsp
@@ -197,7 +200,7 @@ jinja2==3.1.6
     #   jupyterlab
     #   jupyterlab-server
     #   nbconvert
-joblib==1.5.2
+joblib==1.5.3
     # via contextily
 json5==0.12.1
     # via jupyterlab-server
@@ -279,7 +282,7 @@ lark==1.3.1
     # via rfc3987-syntax
 llvmlite==0.43.0 ; python_full_version < '3.10'
     # via numba
-llvmlite==0.45.1 ; python_full_version >= '3.10'
+llvmlite==0.46.0 ; python_full_version >= '3.10'
     # via numba
 markupsafe==3.0.3
     # via
@@ -290,7 +293,7 @@ matplotlib==3.9.4 ; python_full_version < '3.10'
     #   contextily
     #   gasnetsim
     #   seaborn
-matplotlib==3.10.7 ; python_full_version >= '3.10'
+matplotlib==3.10.8 ; python_full_version >= '3.10'
     # via
     #   cartopy
     #   contextily
@@ -306,7 +309,7 @@ mistune==3.2.0
     # via nbconvert
 mypy-extensions==1.1.0
     # via black
-narwhals==2.12.0
+narwhals==2.14.0
     # via plotly
 nbclient==0.10.2 ; python_full_version < '3.10'
     # via nbconvert
@@ -325,7 +328,7 @@ nest-asyncio==1.6.0
     # via ipykernel
 networkx==3.2.1
     # via gasnetsim
-nodeenv==1.9.1
+nodeenv==1.10.0
     # via pre-commit
 notebook==7.5.1
     # via jupyter
@@ -335,7 +338,7 @@ notebook-shim==0.2.4
     #   notebook
 numba==0.60.0 ; python_full_version < '3.10'
     # via gasnetsim
-numba==0.62.1 ; python_full_version >= '3.10'
+numba==0.63.1 ; python_full_version >= '3.10'
     # via gasnetsim
 numpy==1.26.4
     # via
@@ -347,7 +350,6 @@ numpy==1.26.4
     #   matplotlib
     #   numba
     #   pandas
-    #   pyarrow
     #   pyogrio
     #   rasterio
     #   scipy
@@ -399,7 +401,7 @@ platformdirs==4.4.0 ; python_full_version < '3.10'
     #   black
     #   jupyter-core
     #   virtualenv
-platformdirs==4.5.0 ; python_full_version >= '3.10'
+platformdirs==4.5.1 ; python_full_version >= '3.10'
     # via
     #   black
     #   jupyter-core
@@ -409,7 +411,7 @@ plotly==6.5.0
 pluggy==1.6.0
     # via pytest
 pre-commit==4.3.0 ; python_full_version < '3.10'
-pre-commit==4.4.0 ; python_full_version >= '3.10'
+pre-commit==4.5.1 ; python_full_version >= '3.10'
 prometheus-client==0.23.1
     # via jupyter-server
 prompt-toolkit==3.0.52
@@ -424,9 +426,9 @@ ptyprocess==0.7.0 ; (python_full_version < '3.10' and sys_platform == 'emscripte
     #   terminado
 pure-eval==0.2.3
     # via stack-data
-py==1.11.0
-    # via pytest
-pyarrow==17.0.0
+pyarrow==21.0.0 ; python_full_version < '3.10'
+    # via gasnetsim
+pyarrow==22.0.0 ; python_full_version >= '3.10'
     # via gasnetsim
 pycparser==2.23 ; implementation_name != 'PyPy'
     # via cffi
@@ -436,7 +438,10 @@ pygments==2.19.2
     #   ipython-pygments-lexers
     #   jupyter-console
     #   nbconvert
-pyogrio==0.11.1
+    #   pytest
+pyogrio==0.11.1 ; python_full_version < '3.10'
+    # via geopandas
+pyogrio==0.12.1 ; python_full_version >= '3.10'
     # via geopandas
 pyparsing==3.0.9
     # via
@@ -453,9 +458,11 @@ pyproj==3.7.2 ; python_full_version >= '3.11'
     # via
     #   cartopy
     #   geopandas
-pyshp==3.0.2.post1 ; python_full_version >= '3.10'
+pyshp==3.0.3 ; python_full_version >= '3.10'
     # via cartopy
-pytest==6.2.5
+pytest==8.4.2 ; python_full_version < '3.10'
+    # via gasnetsim
+pytest==9.0.2 ; python_full_version >= '3.10'
     # via gasnetsim
 python-dateutil==2.9.0.post0
     # via
@@ -465,6 +472,8 @@ python-dateutil==2.9.0.post0
     #   pandas
 python-json-logger==4.0.0
     # via jupyter-events
+pytokens==0.3.0
+    # via black
 pytz==2025.2
     # via pandas
 pywin32==311 ; python_full_version < '3.10' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'
@@ -484,7 +493,9 @@ pyzmq==27.1.0
     #   jupyter-client
     #   jupyter-console
     #   jupyter-server
-rasterio==1.4.3
+rasterio==1.4.3 ; python_full_version < '3.10'
+    # via contextily
+rasterio==1.4.4 ; python_full_version >= '3.10'
     # via contextily
 referencing==0.36.2 ; python_full_version < '3.10'
     # via
@@ -519,7 +530,7 @@ rpds-py==0.30.0 ; python_full_version >= '3.10'
     # via
     #   jsonschema
     #   referencing
-ruamel-yaml==0.18.16
+ruamel-yaml==0.18.17
     # via cantera
 ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
     # via ruamel-yaml
@@ -560,12 +571,11 @@ terminado==0.18.1
     #   jupyter-server-terminals
 tinycss2==1.4.0
     # via bleach
-toml==0.10.2
-    # via pytest
 tomli==2.3.0 ; python_full_version < '3.11'
     # via
     #   black
     #   jupyterlab
+    #   pytest
 tornado==6.5.4
     # via
     #   ipykernel
@@ -603,13 +613,13 @@ typing-extensions==4.15.0
     #   python-json-logger
     #   referencing
     #   virtualenv
-tzdata==2025.2
+tzdata==2025.3
     # via
     #   arrow
     #   pandas
 uri-template==1.3.0
     # via jsonschema
-urllib3==2.5.0
+urllib3==2.6.2
     # via requests
 virtualenv==20.35.4
     # via pre-commit
@@ -627,7 +637,7 @@ websocket-client==1.9.0
     # via jupyter-server
 widgetsnbextension==4.0.15
     # via ipywidgets
-xyzservices==2025.10.0
+xyzservices==2025.11.0
     # via contextily
 zipp==3.23.0 ; python_full_version < '3.10'
     # via
