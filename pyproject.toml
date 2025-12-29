@@ -1,6 +1,6 @@
 [project]
 name = "GasNetSim"
-version = "0.2.0"
+version = "0.2.1"
 description = "A tool for gas network steady-state simulation."
 readme = "README.md"
 license = { text = "MPL-2.0" }
