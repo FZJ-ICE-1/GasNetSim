@@ -16,6 +16,9 @@ from scipy.constants import atm
 from ..network import Network
 from ..node import Node
 from ..pipeline import Pipeline, Resistance, ShortPipe, LinearResistance
+from ..dynamic.dynamic_network import DynamicNetwork
+from ..dynamic.dynamic_node import DynamicNode
+from ..dynamic.dynamic_pipeline import DynamicPipeline
 from ..compressor import Compressor
 from ..gas_mixture.typical_mixture_composition import COMMON_GAS_COMPOSITIONS
 from ...utils.exception import *
@@ -42,7 +45,9 @@ def convert_gas_composition(gas_composition: str) -> OrderedDict:
         )
 
 
-def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
+def read_nodes(
+    path_to_file: Path, base_composition=None, node_cls=Node
+) -> dict[int, Node]:
     """
     Read nodes from a CSV file and create Node objects.
 
@@ -73,7 +78,7 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
         else:
             row["gas_composition"] = base_composition
 
-        nodes[row["node_index"]] = Node(
+        nodes[row["node_index"]] = node_cls(
             node_index=row["node_index"],
             pressure_pa=absolute_pressure_pa,
             volumetric_flow=row["flow_sm3_per_s"],
@@ -90,7 +95,7 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
 
 
 def read_pipelines(
-    path_to_file: Path, network_nodes: dict, conversion_factor=1.0
+    path_to_file: Path, network_nodes: dict, conversion_factor=1.0, pipe_cls=Pipeline
 ) -> dict:
     """
 
@@ -104,7 +109,7 @@ def read_pipelines(
 
     for row_index, row in df_pipe.iterrows():
         friction_method = row.get("friction_method", "chen") or "chen"
-        pipelines[row["pipeline_index"]] = Pipeline(
+        pipelines[row["pipeline_index"]] = pipe_cls(
             pipeline_index=row["pipeline_index"],
             inlet=network_nodes[row["inlet_index"]],
             outlet=network_nodes[row["outlet_index"]],
@@ -227,7 +232,10 @@ import warnings
 
 
 def create_network_from_csv(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path,
+    conversion_factor=1.0,
+    base_composition=None,
+    dynamic=False,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
@@ -243,12 +251,15 @@ def create_network_from_csv(
         stacklevel=2,
     )
     return create_network_from_folder(
-        path_to_folder, conversion_factor, base_composition
+        path_to_folder, conversion_factor, base_composition, dynamic
     )
 
 
 def create_network_from_folder(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path,
+    conversion_factor=1.0,
+    base_composition=None,
+    dynamic=False,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
@@ -263,7 +274,13 @@ def create_network_from_folder(
     if nodes_file is None:
         raise FileNotFoundError("Nodes file is required to create the network.")
 
-    nodes = read_nodes(nodes_file, base_composition=base_composition)
+    node_cls = DynamicNode if dynamic else Node
+    pipe_cls = DynamicPipeline if dynamic else Pipeline
+    net_cls = DynamicNetwork if dynamic else Network
+
+    nodes = read_nodes(
+        nodes_file, base_composition=base_composition, node_cls=node_cls
+    )
 
     # Initialize network components
     network_components = {
@@ -291,14 +308,14 @@ def create_network_from_folder(
             if component_key in file_name:
                 if component_key == "pipeline":
                     network_components[component_key + "s"] = read_function(
-                        file, nodes, conversion_factor
+                        file, nodes, conversion_factor, pipe_cls=pipe_cls
                     )
                 else:
                     network_components[component_key + "s"] = read_function(file, nodes)
                 break
 
     # Create and return the Network object
-    return Network(
+    return net_cls(
         nodes=network_components["nodes"],
         pipelines=network_components["pipelines"],
         compressors=network_components["compressors"],
@@ -309,7 +326,10 @@ def create_network_from_folder(
 
 
 def create_network_from_files(
-    component_files: dict[str, Path], conversion_factor=1.0
+    component_files: dict[str, Path],
+    conversion_factor=1.0,
+    base_composition=None,
+    dynamic=False,
 ) -> Network:
     """
     Create a Network object from specified component CSV files.
@@ -324,7 +344,11 @@ def create_network_from_files(
         raise ValueError("Nodes file is required to create the network.")
 
     # Read nodes
-    nodes = read_nodes(nodes_file)
+    node_cls = DynamicNode if dynamic else Node
+    pipe_cls = DynamicPipeline if dynamic else Pipeline
+    net_cls = DynamicNetwork if dynamic else Network
+
+    nodes = read_nodes(nodes_file, base_composition=base_composition, node_cls=node_cls)
 
     # Initialize network components
     network_components = {
@@ -350,7 +374,10 @@ def create_network_from_files(
         if component_name in component_files:
             if component_name == "pipelines":
                 network_components[component_name] = read_function(
-                    component_files[component_name], nodes, conversion_factor
+                    component_files[component_name],
+                    nodes,
+                    conversion_factor,
+                    pipe_cls=pipe_cls,
                 )
             else:
                 network_components[component_name] = read_function(
@@ -358,7 +385,7 @@ def create_network_from_files(
                 )
 
     # Create and return the Network object
-    return Network(
+    return net_cls(
         nodes=network_components["nodes"],
         pipelines=network_components["pipelines"],
         compressors=network_components["compressors"],
