@@ -84,6 +84,57 @@ def _resolve_demands(
     return demand_list
 
 
+def _apply_demand_events(
+    network: DynamicNetwork,
+    demand_list: List[Tuple[int, np.ndarray]],
+    events: Optional[List[Dict]],
+    dt: float,
+    n_steps: int,
+) -> List[Tuple[int, np.ndarray]]:
+    # Apply step events to demand profiles (mult/add/set from a given time/step)
+    if not events:
+        return demand_list
+
+    demand_map = {idx: profile.copy() for idx, profile in demand_list}
+
+    for event in events:
+        # Identify target node (node id or global index)
+        if "node" in event:
+            global_idx = network.node_id_to_global_index(event["node"])
+        elif "global_idx" in event:
+            global_idx = int(event["global_idx"])
+        else:
+            raise ValueError("Event must include 'node' or 'global_idx'.")
+
+        # Resolve event time to step index
+        if "step" in event:
+            step = int(event["step"])
+        elif "time" in event:
+            step = int(float(event["time"]) / dt)
+        else:
+            raise ValueError("Event must include 'step' or 'time'.")
+
+        step = max(0, min(step, n_steps - 1))
+
+        profile = demand_map.get(global_idx)
+        if profile is None:
+            profile = np.zeros(n_steps, dtype=float)
+
+        # Apply operation from step onward
+        if "mult" in event:
+            profile[step:] *= float(event["mult"])
+        elif "add" in event:
+            profile[step:] += float(event["add"])
+        elif "set" in event:
+            profile[step:] = float(event["set"])
+        else:
+            raise ValueError("Event must include 'mult', 'add', or 'set'.")
+
+        demand_map[global_idx] = profile
+
+    return list(demand_map.items())
+
+
 def simulate_transient(
     network: DynamicNetwork,
     dt: float,
@@ -94,12 +145,18 @@ def simulate_transient(
     T_nodes: Optional[np.ndarray] = None,
     supply_pressures: Optional[np.ndarray] = None,
     demands: Optional[Dict[int, np.ndarray]] = None,
+    events: Optional[List[Dict]] = None,
     save_to_file: bool = False,
     output_format: str = "excel",
     output_filename: str = "dynamic_results",
 ):
     """
     Run a transient Pi-model simulation on a DynamicNetwork.
+
+    events: list of dicts with keys:
+      - node (node_id) or global_idx
+      - time (seconds) or step (int)
+      - mult / add / set (operation on demand profile from that time onward)
     """
     if dt <= 0:
         raise ValueError("dt must be positive.")
@@ -121,6 +178,7 @@ def simulate_transient(
 
     supply_p = _resolve_supply_pressures(network, supply_pressures)
     demand_list = _resolve_demands(network, demands, n_steps)
+    demand_list = _apply_demand_events(network, demand_list, events, dt, n_steps)
 
     # Assemble constant Y once; update I and states each step
     network.reset_states()
