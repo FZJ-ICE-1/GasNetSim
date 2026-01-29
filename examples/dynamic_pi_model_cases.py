@@ -125,7 +125,7 @@ def case_forward_flow():
     for dt in [1, 10, 30]:
         n_steps = int(t_end / dt)
         demand_profile = np.ones(n_steps) * 20.0
-        demand_profile[int(1500 / dt) :] = 10.0
+        events = [{"node": n_segments + 1, "time": 1500.0, "mult": 0.5}]
 
         time_sim, P_hist = simulate_transient(
             net,
@@ -136,6 +136,7 @@ def case_forward_flow():
             P0=np.ones(n_segments + 1) * 50e5,
             supply_pressures=supply_p,
             demands={n_segments + 1: demand_profile},
+            events=events,
         )
         plt.plot(time_sim, P_hist[-1] / 1e6, label=f"dt = {dt} s")
 
