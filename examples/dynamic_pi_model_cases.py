@@ -12,12 +12,22 @@ from GasNetSim.simulation.dynamic import simulate_transient
 
 
 def build_segmented_network(
-    n_segments,
     length_total,
     diameter,
     friction,
+    n_segments=None,
+    segment_length_m=None,
     supply_at_outlet=False,
 ):
+    if n_segments is None:
+        if segment_length_m is None:
+            raise ValueError("Provide n_segments or segment_length_m.")
+        if segment_length_m <= 0:
+            raise ValueError("segment_length_m must be > 0.")
+        n_segments = int(np.ceil(length_total / segment_length_m))
+    if int(n_segments) < 1:
+        raise ValueError("n_segments must be >= 1.")
+    n_segments = int(n_segments)
     n_nodes = n_segments + 1
     nodes = {}
 
@@ -60,9 +70,10 @@ def case_single_segment():
     diameter = 0.6
     friction = 0.01
     length_total = 50e3
+    n_segments = 10
 
     net = build_segmented_network(
-        n_segments=1,
+        n_segments=n_segments,
         length_total=length_total,
         diameter=diameter,
         friction=friction,
@@ -84,9 +95,9 @@ def case_single_segment():
             t_end=t_end,
             Z=1.0,
             M=0.016,
-            P0=np.array([50e5, 50e5]),
+            P0=np.full(n_segments + 1, 50e5),
             supply_pressures=supply_p,
-            demands={2: demand_profile},
+            demands={n_segments + 1: demand_profile},
         )
         plt.plot(time_sim, P_hist[-1] / 1e6, label=f"dt = {dt} s")
 
@@ -105,12 +116,13 @@ def case_forward_flow():
     diameter = 0.6
     friction = 0.01
     length_total = 50e3
-    n_segments = 10
+    segment_length_m = 10e3
+    n_segments = int(np.ceil(length_total / segment_length_m))
     t_end = 3000.0
     supply_p = 50e5
 
     net = build_segmented_network(
-        n_segments=n_segments,
+        segment_length_m=segment_length_m,
         length_total=length_total,
         diameter=diameter,
         friction=friction,
