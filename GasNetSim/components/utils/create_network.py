@@ -7,11 +7,13 @@
 #     Last change by yifei
 #    *****************************************************************************
 from collections import OrderedDict
+import math
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import warnings
 from scipy.constants import atm
+from typing import Callable, Dict, Optional, Tuple
 
 from ..network import Network
 from ..node import Node
@@ -119,6 +121,170 @@ def read_pipelines(
             conversion_factor=conversion_factor,
         )
     return pipelines
+
+
+def _apply_length_overrides(pipelines: dict, length_overrides: Optional[Dict[int, float]]):
+    if not length_overrides:
+        return
+    for pipe_id, new_len in length_overrides.items():
+        if pipe_id not in pipelines:
+            raise ValueError(f"Pipeline ID {pipe_id} not found for length override.")
+        length_val = float(new_len)
+        if length_val <= 0:
+            raise ValueError(f"Invalid length override for pipeline {pipe_id}: {new_len}")
+        pipelines[pipe_id].length = length_val
+
+
+def _default_interpolate_value(
+    v0: Optional[float], v1: Optional[float], frac: float
+) -> Optional[float]:
+    if v0 is None and v1 is None:
+        return None
+    if v0 is None:
+        return v1
+    if v1 is None:
+        return v0
+    return v0 + (v1 - v0) * frac
+
+
+def _segment_pipelines(
+    nodes: dict,
+    pipelines: dict,
+    node_cls=Node,
+    pipe_cls=Pipeline,
+    segment_length_m: Optional[float] = None,
+    segments_per_pipe: Optional[int] = None,
+    temperature_interpolator: Optional[
+        Callable[[Optional[float], Optional[float], float], Optional[float]]
+    ] = None,
+) -> Tuple[dict, dict]:
+    """
+    Discretize each pipeline into multiple segments by inserting intermediate nodes.
+    Original (real) nodes keep their indices; new nodes are appended after max ID.
+    temperature_interpolator: optional callable for temperature interpolation between endpoints.
+    """
+    if not pipelines:
+        return nodes, pipelines
+
+    if segments_per_pipe is None and segment_length_m is None:
+        raise ValueError("Segmentation requested but no segment length/count provided.")
+    if segments_per_pipe is not None:
+        if int(segments_per_pipe) < 1:
+            raise ValueError("segments_per_pipe must be >= 1.")
+    if segment_length_m is not None:
+        if float(segment_length_m) <= 0:
+            raise ValueError("segment_length_m must be > 0.")
+
+    new_nodes = dict(nodes)
+    new_pipelines = dict()
+
+    next_node_id = max(new_nodes.keys()) + 1 if new_nodes else 1
+    # When segmenting, reindex pipelines sequentially (1..N) to preserve
+    # assumptions in steady-state composition tracking.
+    next_pipe_id = 1
+
+    for pipe in pipelines.values():
+        parent_id = pipe.pipeline_index
+        L = float(pipe.length)
+        if L <= 0:
+            raise ValueError(f"Pipeline {pipe.pipeline_index} has invalid length {pipe.length}")
+
+        if segments_per_pipe is not None:
+            n_segments = int(segments_per_pipe)
+        else:
+            n_segments = int(math.ceil(L / float(segment_length_m)))
+        n_segments = max(1, n_segments)
+
+        if n_segments == 1:
+            # Keep pipe as-is but reindex sequentially for segmented mode
+            pipe.pipeline_index = next_pipe_id
+            setattr(pipe, "parent_pipeline_index", parent_id)
+            setattr(pipe, "segment_index", 0)
+            new_pipelines[next_pipe_id] = pipe
+            next_pipe_id += 1
+            continue
+
+        seg_length = L / n_segments
+
+        inlet = pipe.inlet
+        outlet = pipe.outlet
+
+        h0 = getattr(inlet, "altitude", 0.0) or 0.0
+        h1 = getattr(outlet, "altitude", 0.0) or 0.0
+        t0 = getattr(inlet, "temperature", None)
+        t1 = getattr(outlet, "temperature", None)
+        gas_comp = getattr(inlet, "gas_composition", None) or getattr(outlet, "gas_composition", None)
+        temp_interp = temperature_interpolator or _default_interpolate_value
+
+        prev_node = inlet
+
+        for seg_idx in range(1, n_segments):
+            frac = seg_idx / n_segments
+            altitude = h0 + (h1 - h0) * frac
+            temp = temp_interp(t0, t1, frac)
+
+            new_node = node_cls(
+                node_index=next_node_id,
+                pressure_pa=None,
+                volumetric_flow=0.0,
+                energy_flow=None,
+                temperature=temp if temp is not None else 288.15,
+                altitude=altitude,
+                gas_composition=gas_comp,
+                node_type="junction",
+                flow_type="volumetric",
+                longitude=None,
+                latitude=None,
+            )
+            new_nodes[next_node_id] = new_node
+            next_node_id += 1
+
+            seg_pipe = pipe_cls(
+                pipeline_index=next_pipe_id,
+                inlet=prev_node,
+                outlet=new_node,
+                diameter=pipe.diameter,
+                length=seg_length,
+                efficiency=getattr(pipe, "efficiency", 0.85),
+                roughness=getattr(pipe, "roughness", 0.000015),
+                ambient_temp=getattr(pipe, "ambient_temp", 288.15),
+                ambient_pressure=getattr(pipe, "ambient_pressure", 101325.0),
+                heat_transfer_coefficient=getattr(pipe, "heat_transfer_coefficient", 3.69),
+                valve=getattr(pipe, "valve", 0),
+                friction_factor_method=getattr(pipe, "friction_factor_method", "chen"),
+                conversion_factor=getattr(pipe, "conversion_factor", 1.0),
+                constant_friction_factor=getattr(pipe, "constant_friction_factor", None),
+            )
+            setattr(seg_pipe, "parent_pipeline_index", parent_id)
+            setattr(seg_pipe, "segment_index", seg_idx - 1)
+            new_pipelines[next_pipe_id] = seg_pipe
+            next_pipe_id += 1
+
+            prev_node = new_node
+
+        # Final segment to original outlet
+        seg_pipe = pipe_cls(
+            pipeline_index=next_pipe_id,
+            inlet=prev_node,
+            outlet=outlet,
+            diameter=pipe.diameter,
+            length=seg_length,
+            efficiency=getattr(pipe, "efficiency", 0.85),
+            roughness=getattr(pipe, "roughness", 0.000015),
+            ambient_temp=getattr(pipe, "ambient_temp", 288.15),
+            ambient_pressure=getattr(pipe, "ambient_pressure", 101325.0),
+            heat_transfer_coefficient=getattr(pipe, "heat_transfer_coefficient", 3.69),
+            valve=getattr(pipe, "valve", 0),
+            friction_factor_method=getattr(pipe, "friction_factor_method", "chen"),
+            conversion_factor=getattr(pipe, "conversion_factor", 1.0),
+            constant_friction_factor=getattr(pipe, "constant_friction_factor", None),
+        )
+        setattr(seg_pipe, "parent_pipeline_index", parent_id)
+        setattr(seg_pipe, "segment_index", n_segments - 1)
+        new_pipelines[next_pipe_id] = seg_pipe
+        next_pipe_id += 1
+
+    return new_nodes, new_pipelines
 
 
 def read_compressors(path_to_file: Path, network_nodes: dict) -> dict:
@@ -236,6 +402,13 @@ def create_network_from_csv(
     conversion_factor=1.0,
     base_composition=None,
     dynamic=False,
+    segment_pipes: bool = False,
+    segment_length_m: Optional[float] = None,
+    segments_per_pipe: Optional[int] = None,
+    length_overrides: Optional[Dict[int, float]] = None,
+    temperature_interpolator: Optional[
+        Callable[[Optional[float], Optional[float], float], Optional[float]]
+    ] = None,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
@@ -251,7 +424,15 @@ def create_network_from_csv(
         stacklevel=2,
     )
     return create_network_from_folder(
-        path_to_folder, conversion_factor, base_composition, dynamic
+        path_to_folder,
+        conversion_factor,
+        base_composition,
+        dynamic,
+        segment_pipes=segment_pipes,
+        segment_length_m=segment_length_m,
+        segments_per_pipe=segments_per_pipe,
+        length_overrides=length_overrides,
+        temperature_interpolator=temperature_interpolator,
     )
 
 
@@ -260,12 +441,24 @@ def create_network_from_folder(
     conversion_factor=1.0,
     base_composition=None,
     dynamic=False,
+    segment_pipes: bool = False,
+    segment_length_m: Optional[float] = None,
+    segments_per_pipe: Optional[int] = None,
+    length_overrides: Optional[Dict[int, float]] = None,
+    temperature_interpolator: Optional[
+        Callable[[Optional[float], Optional[float], float], Optional[float]]
+    ] = None,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
 
     :param path_to_folder: Path to the folder containing the CSV files.
     :param conversion_factor: Conversion factor for pipeline data.
+    :param segment_pipes: If True, split each pipeline into multiple segments.
+    :param segment_length_m: Target segment length [m] when segmenting.
+    :param segments_per_pipe: Fixed number of segments per pipe (overrides segment_length_m).
+    :param length_overrides: Optional dict {pipeline_id: length_m} to override CSV lengths.
+    :param temperature_interpolator: Optional callable to interpolate temperatures along segmented pipes.
     :return: A Network object.
     """
     all_files = list(path_to_folder.glob("*.csv"))
@@ -314,6 +507,24 @@ def create_network_from_folder(
                     network_components[component_key + "s"] = read_function(file, nodes)
                 break
 
+    # Optional: override pipe lengths before segmentation
+    if network_components["pipelines"] is not None and length_overrides:
+        _apply_length_overrides(network_components["pipelines"], length_overrides)
+
+    # Optional: segment pipelines (insert intermediate nodes)
+    if segment_pipes and network_components["pipelines"] is not None:
+        nodes, pipelines = _segment_pipelines(
+            nodes=network_components["nodes"],
+            pipelines=network_components["pipelines"],
+            node_cls=node_cls,
+            pipe_cls=pipe_cls,
+            segment_length_m=segment_length_m,
+            segments_per_pipe=segments_per_pipe,
+            temperature_interpolator=temperature_interpolator,
+        )
+        network_components["nodes"] = nodes
+        network_components["pipelines"] = pipelines
+
     # Create and return the Network object
     return net_cls(
         nodes=network_components["nodes"],
@@ -330,12 +541,24 @@ def create_network_from_files(
     conversion_factor=1.0,
     base_composition=None,
     dynamic=False,
+    segment_pipes: bool = False,
+    segment_length_m: Optional[float] = None,
+    segments_per_pipe: Optional[int] = None,
+    length_overrides: Optional[Dict[int, float]] = None,
+    temperature_interpolator: Optional[
+        Callable[[Optional[float], Optional[float], float], Optional[float]]
+    ] = None,
 ) -> Network:
     """
     Create a Network object from specified component CSV files.
 
     :param component_files: A dictionary mapping component names (e.g., 'nodes', 'pipelines') to file paths.
     :param conversion_factor: Conversion factor for pipeline data.
+    :param segment_pipes: If True, split each pipeline into multiple segments.
+    :param segment_length_m: Target segment length [m] when segmenting.
+    :param segments_per_pipe: Fixed number of segments per pipe (overrides segment_length_m).
+    :param length_overrides: Optional dict {pipeline_id: length_m} to override CSV lengths.
+    :param temperature_interpolator: Optional callable to interpolate temperatures along segmented pipes.
     :return: A Network object.
     """
     # Ensure nodes file is provided
@@ -383,6 +606,24 @@ def create_network_from_files(
                 network_components[component_name] = read_function(
                     component_files[component_name], nodes
                 )
+
+    # Optional: override pipe lengths before segmentation
+    if network_components["pipelines"] is not None and length_overrides:
+        _apply_length_overrides(network_components["pipelines"], length_overrides)
+
+    # Optional: segment pipelines (insert intermediate nodes)
+    if segment_pipes and network_components["pipelines"] is not None:
+        nodes, pipelines = _segment_pipelines(
+            nodes=network_components["nodes"],
+            pipelines=network_components["pipelines"],
+            node_cls=node_cls,
+            pipe_cls=pipe_cls,
+            segment_length_m=segment_length_m,
+            segments_per_pipe=segments_per_pipe,
+            temperature_interpolator=temperature_interpolator,
+        )
+        network_components["nodes"] = nodes
+        network_components["pipelines"] = pipelines
 
     # Create and return the Network object
     return net_cls(
