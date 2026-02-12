@@ -6,8 +6,14 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from GasNetSim.components.utils.create_network import create_network_from_folder
-from GasNetSim.simulation.dynamic import simulate_transient
+from GasNetSim.components.utils.create_dynamic_network import (
+    build_constant_demands_from_csv_volumetric,
+    build_dynamic_network_from_folder,
+    get_static_initial_pressures_from_folder,
+)
+from GasNetSim.simulation.dynamic import (
+    simulate_transient,
+)
 
 # Table 3 (Ekhtiari et al., 2019) reference pressures in bar gauge
 IRISH13_REFERENCE_PRESSURES = {
@@ -64,125 +70,17 @@ IRISH13_REFERENCE_PRESSURES = {
     ),
 }
 
-# Helper functions to preprocess the network data and extract demand profiles from CSV inputs
-
-# Mark nodes with flow_type == volumetric as demand nodes
-def _infer_demand_nodes(network):
-    demand_ids = []
-    for node in network.nodes.values():
-        node_type = str(node.node_type).lower() if node.node_type is not None else ""
-        if node_type in {"reference", "supply", "slack", "junction"}:
-            continue
-        flow_type = (
-            str(node.flow_type).lower() if node.flow_type is not None else ""
-        )
-        if flow_type == "volumetric":
-            node.node_type = "demand"
-            demand_ids.append(node.index)
-    return demand_ids
-
-def _fill_missing_pressures(network, default_pressure=None):
-    supply_pressures = [
-        node.pressure
-        for node in network.get_supply_nodes()
-        if node.pressure is not None
-    ]
-    if supply_pressures:
-        default_pressure = float(supply_pressures[0])
-    if default_pressure is None:
-        default_pressure = 50e5
-
-    for node in network.nodes.values():
-        if node.pressure is None:
-            if hasattr(node, "set_pressure"):
-                node.set_pressure(default_pressure)
-            else:
-                node.pressure = default_pressure
-
-    return default_pressure
-
-
-def _fill_missing_temperatures(network, default_temperature=288.15):
-    for node in network.nodes.values():
-        if node.temperature is None:
-            node.temperature = default_temperature
-
-
-def _get_static_initial_pressures(
-    data_dir,
-    segment_pipes=False,
-    segment_length_m=None,
-    segments_per_pipe=None,
-    length_overrides=None,
-    temperature_interpolator=None,
-):
-    static_net = create_network_from_folder(
-        data_dir,
-        dynamic=False,
-        segment_pipes=segment_pipes,
-        segment_length_m=segment_length_m,
-        segments_per_pipe=segments_per_pipe,
-        length_overrides=length_overrides,
-        temperature_interpolator=temperature_interpolator,
-    )
-    for pipe in static_net.pipelines.values():
-        pipe.friction_factor_method = "constant"
-        pipe.constant_friction_factor = 0.01
-        pipe.efficiency = 1.0
-    try:
-        static_net.simulation(tol=1e-4)
-    except Exception as e:
-        print(f"Static init failed: {e}. Falling back to supply-based P0.")
-        return None
-
-    P0 = np.zeros(static_net.n_nodes if hasattr(static_net, "n_nodes") else len(static_net.nodes))
-    for sim_idx in range(len(static_net.nodes)):
-        node_id = static_net.simulation_node_index_to_node_id(sim_idx)
-        P0[sim_idx] = static_net.nodes[node_id].pressure
-    return P0
-
-
-def _build_network(
-    data_dir,
-    segment_pipes=False,
-    segment_length_m=None,
-    segments_per_pipe=None,
-    length_overrides=None,
-    temperature_interpolator=None,
-):
-    net = create_network_from_folder(
-        data_dir,
-        dynamic=True,
-        segment_pipes=segment_pipes,
-        segment_length_m=segment_length_m,
-        segments_per_pipe=segments_per_pipe,
-        length_overrides=length_overrides,
-        temperature_interpolator=temperature_interpolator,
-    )
-
-    _fill_missing_pressures(net)
-    _fill_missing_temperatures(net)
-
-    # Constant friction factor for all pipes (Pi-model assumption)
-    for pipe in net.pipelines.values():
-        pipe.friction_factor_method = "constant"
-        pipe.constant_friction_factor = 0.01
-        pipe.efficiency = 1.0
-
-    return net
-
-
 def main():
     data_dir = Path(__file__).resolve().parent
     segment_pipes = True
-    segment_length_m = 20_000.0 
+    segment_length_m = 20_000.0
     segments_per_pipe = None
     length_overrides = None
     temperature_interpolator = None
     compare_to_reference = False
     compare_to_static = True
 
-    net_base = _build_network(
+    net_base = build_dynamic_network_from_folder(
         data_dir,
         segment_pipes=segment_pipes,
         segment_length_m=segment_length_m,
@@ -190,7 +88,7 @@ def main():
         length_overrides=length_overrides,
         temperature_interpolator=temperature_interpolator,
     )
-    net_pert = _build_network(
+    net_pert = build_dynamic_network_from_folder(
         data_dir,
         segment_pipes=segment_pipes,
         segment_length_m=segment_length_m,
@@ -198,43 +96,72 @@ def main():
         length_overrides=length_overrides,
         temperature_interpolator=temperature_interpolator,
     )
+
+    # Dynamic Pi-model constants (calibrated from steady-state by default)
+    Z = 0.88
+    M = 0.0168
+    use_calibrated_zm_from_static = True
+
+    # Use the same standard base as steady-state code convention (15 degC, 1 atm)
+    T_std_K = 288.15
+    P_std_Pa = 101325.0
+    Z_std = 1.0
 
     dt = 25.0
     t_end = 100000.0
     n_steps = int(t_end / dt)
 
-    demand_ids = _infer_demand_nodes(net_base)
-
-    demands = {}
-    for node_id in demand_ids:
-        node = net_base.nodes[node_id]
-        base = node.mass_flow
-        demands[node_id] = np.ones(n_steps) * base
-
     use_static_init = True
     P0 = None
     if use_static_init:
-        P0 = _get_static_initial_pressures(
+        P0, z_eff, m_eff = get_static_initial_pressures_from_folder(
             data_dir,
             segment_pipes=segment_pipes,
             segment_length_m=segment_length_m,
             segments_per_pipe=segments_per_pipe,
             length_overrides=length_overrides,
             temperature_interpolator=temperature_interpolator,
+            default_Z=Z,
+            default_M=M,
         )
         if P0 is not None and len(P0) != net_base.n_physical_nodes:
             print(
                 "Static init length mismatch; falling back to supply-based P0."
             )
             P0 = None
+        elif use_calibrated_zm_from_static and z_eff is not None and m_eff is not None:
+            Z = float(z_eff)
+            M = float(m_eff)
+            print(
+                f"Calibrated transient constants from steady-state: Z={Z:.4f}, M={M:.6f} kg/mol"
+            )
+
+    print(f"Using transient constants: Z={Z:.4f}, M={M:.6f} kg/mol")
+
+    demands, rho_std, total_q_std, total_m = build_constant_demands_from_csv_volumetric(
+        net_base,
+        n_steps=n_steps,
+        M=M,
+        T_std_K=T_std_K,
+        P_std_Pa=P_std_Pa,
+        Z_std=Z_std,
+    )
+    print(
+        "Demand basis: CSV volumetric flow_sm3_per_s "
+        f"-> mass via rho_std={rho_std:.6f} kg/sm3 "
+        f"(T_std={T_std_K:.2f} K, P_std={P_std_Pa:.1f} Pa, Z_std={Z_std:.2f})"
+    )
+    print(
+        f"Total demand: {total_q_std:.3f} sm3/s -> {total_m:.3f} kg/s"
+    )
 
     # Baseline run (no perturbations)
-    time_base, P_hist_base = simulate_transient(
+    _, P_hist_base = simulate_transient(
         net_base,
         dt=dt,
         t_end=t_end,
-        Z=0.89,
-        M=0.016,
+        Z=Z,
+        M=M,
         demands=demands,
         P0=P0,
         events=[],
@@ -252,19 +179,19 @@ def main():
         net_pert,
         dt=dt,
         t_end=t_end,
-        Z=0.89,
-        M=0.016,
+        Z=Z,
+        M=M,
         demands=demands,
         P0=P0,
         events=events,
     )
 
     print("Simulation finished.")
+    ref_node_ids = list(range(1, len(IRISH13_REFERENCE_PRESSURES["novel"]) + 1))
+    ref_sim_idx = [net_pert.node_id_to_simulation_node_index(nid) for nid in ref_node_ids]
 
     # Plot transient pressures (bar gauge) for original Irish13 nodes only
     plt.figure(figsize=(12, 6))
-    ref_node_ids = list(range(1, len(IRISH13_REFERENCE_PRESSURES["novel"]) + 1))
-    ref_sim_idx = [net_pert.node_id_to_simulation_node_index(nid) for nid in ref_node_ids]
     for node_id, sim_idx in zip(ref_node_ids, ref_sim_idx):
         plt.plot(
             time / 3600,
@@ -280,8 +207,6 @@ def main():
     plt.show()
 
     # Compare steady-state to baseline (bar gauge)
-    ref_node_ids = list(range(1, len(IRISH13_REFERENCE_PRESSURES["novel"]) + 1))
-    ref_sim_idx = [net_pert.node_id_to_simulation_node_index(nid) for nid in ref_node_ids]
     P_ss_base_all = P_hist_base[:, -1] / 1e5 - 1.01325
     P_ss_pert_all = P_hist[:, -1] / 1e5 - 1.01325
     P_ss_base = P_ss_base_all[ref_sim_idx]
@@ -303,6 +228,7 @@ def main():
     print(f"{'RMS diff:':<44} {np.sqrt(np.mean(diff**2)):.2f} bar")
 
     # Baseline vs steady-state solver comparison
+    P_ss_static = None
     if P0 is None:
         print("\nStatic baseline unavailable (static init failed).")
     else:
@@ -327,11 +253,7 @@ def main():
         print(f"{'RMS diff:':<44} {np.sqrt(np.mean(diff_base_static**2)):.2f} bar")
 
     if compare_to_static:
-        if P0 is None:
-            print("\nStatic baseline unavailable (static init failed).")
-        else:
-            P_ss_static_all = P0 / 1e5 - 1.01325
-            P_ss_static = P_ss_static_all[ref_sim_idx]
+        if P_ss_static is not None:
             diff_static = P_ss_pert - P_ss_static
 
             print("\nSteady-State Pressure Comparison (Perturbed vs Steady-State Solver)")
