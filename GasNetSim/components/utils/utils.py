@@ -259,6 +259,9 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
         #     outflow_composition = connection.inlet.gas_mixture.eos_composition_tmp
     elif method == "simple_mixing":
         outflow_composition = inflow_composition
+    elif method == "no_mixing":
+        # No mixing: keep outflow composition unchanged (outflow_composition already set correctly above)
+        pass
     else:
         print(f"Method {method} not implemented yet!")
 
