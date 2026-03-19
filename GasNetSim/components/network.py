@@ -700,7 +700,7 @@ class Network:
         delta_flow = [
             delta_flow[i]
             for i in range(len(delta_flow))
-            if i + 1 not in self.junction_nodes
+            if self.simulation_node_index_to_node_id(i) not in self.junction_nodes
         ]
 
     def calculate_nodal_inflow_composition(self):
@@ -745,12 +745,13 @@ class Network:
     #     logging.info(f'Initial pressure: {p}')
     #     logging.info(f'Initial flow: {f}')
     #
-    #     for i in range(len(init_f)):
-    #         # TODO change to number of non-reference nodes
-    #         self.nodes[i + 1].pressure = pressure[i]
-    #         self.nodes[i + 1].volumetric_flow = flow[i]
-    #         self.nodes[i + 1].convert_volumetric_to_energy_flow()
-    #         self.nodes[i + 1].update_gas_mixture()
+    #     # OLD CODE - FIXED: Must use simulation node indexing
+    #     # for i in range(len(init_f)):
+    #     #     node_id = self.simulation_node_index_to_node_id(i)
+    #     #     self.nodes[node_id].pressure = pressure[i]
+    #     #     self.nodes[node_id].volumetric_flow = flow[i]
+    #     #     self.nodes[node_id].convert_volumetric_to_energy_flow()
+    #     #     self.nodes[node_id].update_gas_mixture()
 
     def update_pipeline_parameters(self):
         for index, pipe in self.pipelines.items():
@@ -797,7 +798,7 @@ class Network:
         init_f = [
             init_f[i]
             for i in range(len(init_f))
-            if i + 1 not in self.non_junction_nodes
+            if self.simulation_node_index_to_node_id(i) not in self.non_junction_nodes
         ]
 
         f_target = np.array(init_f)
@@ -819,7 +820,8 @@ class Network:
     def assign_pressure_values(self, p):
         for i in self.nodes.keys():
             if i not in self.reference_nodes:
-                self.nodes[i].pressure = p[i - 1]  # update nodal pressure
+                sim_idx = self.node_id_to_simulation_node_index(i)
+                self.nodes[i].pressure = p[sim_idx]  # update nodal pressure
 
     def newton_raphson_solving(
         self, fun, jac, x, target, alpha=1.0, tol=0.001, max_iter=100
@@ -940,7 +942,7 @@ class Network:
                 [
                     delta_flow[i]
                     for i in range(len(delta_flow))
-                    if i + 1 not in self.non_junction_nodes
+                    if self.simulation_node_index_to_node_id(i) not in self.non_junction_nodes
                 ],
                 use_cuda=use_cuda,
             )
@@ -1005,7 +1007,7 @@ class Network:
                 [
                     f_target[i]
                     for i in range(len(f_target))
-                    if i + 1 not in self.non_junction_nodes
+                    if self.simulation_node_index_to_node_id(i) not in self.non_junction_nodes
                 ],
                 use_cuda=use_cuda,
             )

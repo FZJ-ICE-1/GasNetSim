@@ -438,7 +438,7 @@ def calculate_nodal_inflow_states(
     _prev_nodal_composition_matrix = np.zeros((21, (len(nodes))))
 
     # _count_nodal_inflow_iterations = 0
-    pipelines = {i + 1: c for i, c in connections.items() if type(c) == Pipeline}
+    pipelines = {c.pipeline_index: c for i, c in connections.items() if type(c) == Pipeline}
     graph, edge_index = create_directed_graph_using_flow_directions(connections)
     edge_orders = topological_sort_of_edges(graph, edge_index)
 
