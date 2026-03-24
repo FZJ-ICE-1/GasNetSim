@@ -35,7 +35,6 @@ bleach==6.2.0 ; python_full_version < '3.10'
 bleach==6.3.0 ; python_full_version >= '3.10'
     # via nbconvert
 cantera==3.0.1
-    # via gasnetsim
 cartopy==0.25.0 ; python_full_version >= '3.10'
     # via gasnetsim
 certifi==2025.11.12
@@ -214,7 +213,6 @@ jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
     # via jsonschema
 jupyter==1.1.1
-    # via gasnetsim
 jupyter-client==8.6.3 ; python_full_version < '3.10'
     # via
     #   ipykernel
@@ -461,9 +459,7 @@ pyproj==3.7.2 ; python_full_version >= '3.11'
 pyshp==3.0.3 ; python_full_version >= '3.10'
     # via cartopy
 pytest==8.4.2 ; python_full_version < '3.10'
-    # via gasnetsim
 pytest==9.0.2 ; python_full_version >= '3.10'
-    # via gasnetsim
 python-dateutil==2.9.0.post0
     # via
     #   arrow
@@ -545,9 +541,7 @@ seaborn==0.13.2
 send2trash==1.8.3
     # via jupyter-server
 setuptools==80.9.0
-    # via
-    #   gasnetsim
-    #   jupyterlab
+    # via jupyterlab
 shapely==2.0.7 ; python_full_version < '3.10'
     # via
     #   gasnetsim

@@ -984,16 +984,14 @@ wheels = [
 
 [[package]]
 name = "gasnetsim"
-version = "0.2.0"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
-    { name = "cantera" },
     { name = "cartopy", marker = "python_full_version >= '3.10'" },
     { name = "contextily", version = "1.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "contextily", version = "1.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "geopandas", version = "1.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "geopandas", version = "1.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "jupyter" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "networkx" },
@@ -1006,14 +1004,11 @@ dependencies = [
     { name = "pyarrow", version = "21.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pyarrow", version = "22.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pyparsing" },
-    { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "requests" },
     { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "seaborn" },
-    { name = "setuptools" },
     { name = "shapely", version = "2.0.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "shapely", version = "2.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "tqdm" },
@@ -1023,6 +1018,8 @@ dependencies = [
 dev = [
     { name = "black", version = "25.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "black", version = "25.12.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "cantera" },
+    { name = "jupyter" },
     { name = "parameterized" },
     { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pre-commit", version = "4.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -1032,11 +1029,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cantera", specifier = "~=3.0.0" },
     { name = "cartopy", marker = "python_full_version >= '3.10'", specifier = ">=0.24.1" },
     { name = "contextily", specifier = ">=1.6.2" },
     { name = "geopandas", specifier = ">=1.0.1" },
-    { name = "jupyter", specifier = ">=1.1.1" },
     { name = "matplotlib", specifier = ">=3.3.2" },
     { name = "networkx", specifier = "==3.2.1" },
     { name = "numba", specifier = ">=0.58.1" },
@@ -1046,11 +1041,9 @@ requires-dist = [
     { name = "plotly", specifier = ">=5.23.0" },
     { name = "pyarrow", specifier = ">=17.0.0" },
     { name = "pyparsing", specifier = "~=3.0.7" },
-    { name = "pytest", specifier = ">=6.2.5" },
     { name = "requests", specifier = ">=2.25.1" },
     { name = "scipy", specifier = ">=1.5.2" },
     { name = "seaborn", specifier = ">=0.12.2" },
-    { name = "setuptools", specifier = ">=60.9.3" },
     { name = "shapely", specifier = ">=2.0.6" },
     { name = "tqdm", specifier = ">=4.64.1" },
 ]
@@ -1058,6 +1051,8 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=24.10.0" },
+    { name = "cantera", specifier = "~=3.0.0" },
+    { name = "jupyter", specifier = ">=1.1.1" },
     { name = "parameterized", specifier = ">=0.9.0" },
     { name = "pre-commit", specifier = ">=4.0.1" },
     { name = "pytest", specifier = ">=8.0.0" },
