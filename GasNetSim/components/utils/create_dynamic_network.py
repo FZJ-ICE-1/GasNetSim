@@ -185,6 +185,7 @@ def get_static_initial_pressures_from_folder(
     friction_factor: float = 0.01,
     efficiency: float = 1.0,
     simulation_tol: float = 1e-4,
+    return_node_pressures: bool = False,
 ) -> Tuple[Optional[np.ndarray], Optional[float], Optional[float]]:
     """
     Solve steady state and return physical-node pressures with calibrated Z/M.
@@ -205,17 +206,27 @@ def get_static_initial_pressures_from_folder(
         static_net.simulation(tol=simulation_tol)
     except Exception as exc:
         print(f"Static init failed: {exc}. Falling back to supply-based P0.")
+        if return_node_pressures:
+            return None, None, None, None
         return None, None, None
 
     n_nodes = static_net.n_nodes if hasattr(static_net, "n_nodes") else len(static_net.nodes)
     P0 = np.zeros(n_nodes)
+    p0_by_node = {}
     for sim_idx in range(len(static_net.nodes)):
         node_id = static_net.simulation_node_index_to_node_id(sim_idx)
-        P0[sim_idx] = static_net.nodes[node_id].pressure
+        p_val = static_net.nodes[node_id].pressure
+        P0[sim_idx] = p_val
+        try:
+            p0_by_node[int(node_id)] = float(p_val)
+        except Exception:
+            continue
 
     z_eff, m_eff = estimate_effective_z_m_from_network(
         static_net, default_Z=default_Z, default_M=default_M
     )
+    if return_node_pressures:
+        return P0, z_eff, m_eff, p0_by_node
     return P0, z_eff, m_eff
 
 

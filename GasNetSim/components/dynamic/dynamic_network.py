@@ -73,11 +73,23 @@ class DynamicNetwork(Network):
     @staticmethod
     def _is_demand_node(node) -> bool:
         node_type = getattr(node, "node_type", None)
-        if node_type is None:
+        node_type_str = str(node_type).strip().lower() if node_type is not None else ""
+
+        if node_type_str in {"reference", "supply", "slack"}:
             return False
-        if str(node_type).lower() in {"reference", "supply", "slack"}:
-            return False
-        return str(node_type).lower() == "demand"
+
+        if node_type_str in {"demand", "volumetric", "load", "consumer"}:
+            return True
+
+        # Fallback for legacy CSVs (e.g., Irish13) where demand rows may have
+        # empty node_type but explicit flow definitions.
+        return (
+            node_type_str in {"", "none", "nan"}
+            and (
+                getattr(node, "volumetric_flow", None) is not None
+                or getattr(node, "energy_flow", None) is not None
+            )
+        )
 
     def _assign_global_indices(self):
         """
@@ -152,7 +164,7 @@ class DynamicNetwork(Network):
             Y[v_idx, p_idx] = 1.0
             Y[p_idx, v_idx] = 1.0
 
-        for k, pipe in enumerate(self.pipes):
+        for k in range(len(self.pipes)):
             i = self.i_idx[k]
             j = self.j_idx[k]
 
@@ -169,14 +181,61 @@ class DynamicNetwork(Network):
 
         return Y
 
-    def update_I(self, P_old, dt, Z, T_nodes, M):
+    def _compute_mL_eq(
+        self,
+        k: int,
+        p_avg: float,
+        dt: float,
+        Z: float,
+        T_nodes: np.ndarray,
+        M: float,
+        friction_treatment: str = "explicit",
+    ) -> float:
+        """
+        Compute friction-updated inductor history flow for one pipe.
+
+        ``friction_treatment``:
+          - ``explicit``: legacy explicit Euler-style update
+          - ``semi_implicit``: backward-Euler friction solve (sign-preserving)
+        """
+        pipe = self.pipes[k]
+        i = self.i_idx[k]
+        m_prev = float(self.mL_prev[k])
+
+        area = getattr(pipe, "A", None)
+        if area is None:
+            area = math.pi * (pipe.diameter / 2.0) ** 2
+
+        pipe_d = getattr(pipe, "D", None)
+        if pipe_d is None:
+            pipe_d = pipe.diameter
+
+        friction_coeff = (pipe.f * Z * R_UNIV * T_nodes[i] * dt) / (M * area * pipe_d)
+        a = friction_coeff / p_avg
+
+        if friction_treatment == "explicit":
+            return m_prev - a * m_prev * abs(m_prev)
+
+        if friction_treatment == "semi_implicit":
+            if m_prev == 0.0 or a <= 0.0:
+                return m_prev
+            root = math.sqrt(1.0 + 4.0 * a * abs(m_prev))
+            magnitude = (root - 1.0) / (2.0 * a)
+            return math.copysign(magnitude, m_prev)
+
+        raise ValueError(
+            f"Unknown friction_treatment '{friction_treatment}'. "
+            "Use 'explicit' or 'semi_implicit'."
+        )
+
+    def update_I(self, P_old, dt, Z, T_nodes, M, friction_treatment="explicit"):
         """
         Compute equivalent current injection vector for the Pi-model.
         """
         I_eq = np.zeros(self.n_nodes)
         p_min = 1e5
 
-        for k, pipe in enumerate(self.pipes):
+        for k in range(len(self.pipes)):
             i = self.i_idx[k]
             j = self.j_idx[k]
 
@@ -190,29 +249,24 @@ class DynamicNetwork(Network):
             if p_avg < p_min:
                 p_avg = p_min
 
-            area = getattr(pipe, "A", None)
-            if area is None:
-                area = math.pi * (pipe.diameter / 2.0) ** 2
-
-            pipe_d = getattr(pipe, "D", None)
-            if pipe_d is None:
-                pipe_d = pipe.diameter
-
-            # Explicit friction term using previous inductor flow
-            friction_coeff = (pipe.f * Z * R_UNIV * T_nodes[i] * dt) / (
-                M * area * pipe_d
+            mL_eq = self._compute_mL_eq(
+                k=k,
+                p_avg=p_avg,
+                dt=dt,
+                Z=Z,
+                T_nodes=T_nodes,
+                M=M,
+                friction_treatment=friction_treatment,
             )
-            friction_term = (
-                friction_coeff * self.mL_prev[k] * abs(self.mL_prev[k]) / p_avg
-            )
-            mL_eq = self.mL_prev[k] - friction_term
 
             I_eq[i] += mC_eq_i - mL_eq
             I_eq[j] += mC_eq_j + mL_eq
 
         return I_eq
 
-    def update_states(self, P_old, P_new, dt, Z, T_nodes, M):
+    def update_states(
+        self, P_old, P_new, dt, Z, T_nodes, M, friction_treatment="explicit"
+    ):
         """
         Update Pi-model history terms after solving for new pressures.
         """
@@ -227,22 +281,15 @@ class DynamicNetwork(Network):
             if p_avg < p_min:
                 p_avg = p_min
 
-            area = getattr(pipe, "A", None)
-            if area is None:
-                area = math.pi * (pipe.diameter / 2.0) ** 2
-
-            pipe_d = getattr(pipe, "D", None)
-            if pipe_d is None:
-                pipe_d = pipe.diameter
-
-            # Explicit friction term uses previous inductor flow
-            friction_coeff = (pipe.f * Z * R_UNIV * T_nodes[i] * dt) / (
-                M * area * pipe_d
+            mL_eq = self._compute_mL_eq(
+                k=k,
+                p_avg=p_avg,
+                dt=dt,
+                Z=Z,
+                T_nodes=T_nodes,
+                M=M,
+                friction_treatment=friction_treatment,
             )
-            friction_term = (
-                friction_coeff * self.mL_prev[k] * abs(self.mL_prev[k]) / p_avg
-            )
-            mL_eq = self.mL_prev[k] - friction_term
 
             G_C_i = (M * self.GCc[k]) / (Z * R_UNIV * T_nodes[i] * dt)
             G_C_j = (M * self.GCc[k]) / (Z * R_UNIV * T_nodes[j] * dt)
