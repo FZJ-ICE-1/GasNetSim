@@ -33,6 +33,7 @@ from .utils import *
 #     print(f"CuPy is not installed or not available!")
 
 from .utils.cuda_support import create_matrix_of_zeros, list_to_array
+from .utils.initialization_strategies import INITIALIZATION_STRATEGIES
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ class Network:
         run_initialization=True,
         pressure_prev=None,
         base_composition=None,
+        initialization_strategy='resistance_weighted',
     ):
         """
 
@@ -78,6 +80,7 @@ class Network:
         self.junction_nodes = self.find_junction_nodes()
         self.run_initialization = run_initialization
         self.pressure_prev = pressure_prev
+        self.initialization_strategy = initialization_strategy
 
         if base_composition is not None:
             self.base_composition = base_composition
@@ -428,99 +431,12 @@ class Network:
         return connection
 
     def pressure_initialization(self):
-        nodes = self.nodes
-
-        # create a list to store all component resistance
-        resistance = list()
-        if self.pipelines is not None:
-            pipeline_resistance = [
-                (
-                    [
-                        x.inlet_index,
-                        x.outlet_index,
-                        x.resistance,
-                        x.outlet.volumetric_flow,
-                    ]
-                    if x.outlet.volumetric_flow is not None
-                    else [
-                        x.inlet_index,
-                        x.outlet_index,
-                        x.resistance,
-                        x.inlet.volumetric_flow,
-                    ]
-                )
-                # outlet is reference node
-                for x in self.pipelines.values()
-            ]
-            resistance += pipeline_resistance
-        if self.resistances is not None:
-            resistance_resistance = [
-                [x.inlet_index, x.outlet_index, x.resistance, x.outlet.volumetric_flow]
-                for x in self.resistances.values()
-            ]
-            resistance += resistance_resistance
-        if self.linear_resistances is not None:
-            linear_resistance_resistance = [
-                [x.inlet_index, x.outlet_index, x.resistance, x.outlet.volumetric_flow]
-                for x in self.linear_resistances.values()
-            ]
-            resistance += linear_resistance_resistance
-        if self.shortpipes is not None:
-            shortpipe_resistance = [
-                [x.inlet_index, x.outlet_index, 0, -x.inlet.volumetric_flow]
-                for x in self.shortpipes.values()
-            ]
-            resistance += shortpipe_resistance
-
-        max_resistance = max([x[2] for x in resistance])
-        max_flow = max(
-            [abs(x.volumetric_flow) for x in nodes.values() if x.volumetric_flow is not None]
-        )
-        pressure_init = [node.pressure for node in nodes.values()]
-        # pipeline_with_missing_pressure = copy.deepcopy(pipelines)
-        pressure_init_old = list()
-
-        while pressure_init != pressure_init_old:
-            pressure_init_old = copy.deepcopy(pressure_init)
-            # pipeline_initialized = list()
-            for r in resistance:
-                inlet_node_id = r[0]  # inlet node ID (domain)
-                outlet_node_id = r[1]  # outlet node ID (domain)
-                i = self.node_id_to_simulation_node_index(inlet_node_id)  # simulation index
-                j = self.node_id_to_simulation_node_index(outlet_node_id)  # simulation index
-                res = r[2]  # resistance
-                flow = r[3]
-                if pressure_init[i] is None and pressure_init[j] is None:
-                    pass
-                elif pressure_init[j] is None or pressure_init[i] == pressure_init[j]:
-                    pressure_init[j] = pressure_init[i] * (
-                        1 - 0.5 * (res / max_resistance) * (flow / max_flow)
-                    )
-                    # pressure_init[j] = pressure_init[i] * (1 - 0.0001)
-                    # if res/max_resistance < 0.001:
-                    #     pressure_init[j] = pressure_init[i] * 0.999999
-                    # else:
-                    #     pressure_init[j] = pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow))
-                    # pressure_init[j] = pressure_init[i] * 0.98
-                # elif pressure_init[j] is not None and pressure_init[i] is not None:
-                #     if res/max_resistance < 0.001:
-                #         pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.99999)
-                #     else:
-                #         pressure_init[j] = min(pressure_init[j],
-                #                                pressure_init[i] * (1 - 0.05 * (res/max_resistance) * (flow/max_flow)))
-                #         # pressure_init[j] = min(pressure_init[j], pressure_init[i] * 0.98)
-                elif pressure_init[i] is None and pressure_init[j] is not None:
-                    pressure_init[i] = pressure_init[j] / (
-                        1 - 0.5 * (res / max_resistance) * (flow / max_flow)
-                    )
-                    # pressure_init[i] = pressure_init[j] / (1 - 0.0001)
-                    # if res/max_resistance < 0.001:
-                    #     pressure_init[i] = pressure_init[j] / 0.99999
-                    # else:
-                    #     pressure_init[i] = pressure_init[j] / (1 - 0.05 * (res/max_resistance) * (flow /max_flow))
-                    # pressure_init[i] = pressure_init[j] / 0.98
-
-        return pressure_init
+        if self.initialization_strategy not in INITIALIZATION_STRATEGIES:
+            raise ValueError(
+                f"Unknown initialization strategy: '{self.initialization_strategy}'. "
+                f"Available: {list(INITIALIZATION_STRATEGIES.keys())}"
+            )
+        return INITIALIZATION_STRATEGIES[self.initialization_strategy](self)
 
     def newton_raphson_initialization(self):
         """
