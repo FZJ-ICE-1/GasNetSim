@@ -185,7 +185,7 @@ class TestSparseIndexMapping(TestCase):
         
         # This should not raise any IndexError
         try:
-            network.simulation(max_iter=10, tol=0.1)
+            network.simulation(max_iter=100, tol=0.1)
             simulation_success = True
         except (IndexError, KeyError) as e:
             simulation_success = False
