@@ -45,12 +45,17 @@ class PressureProblem(Problem):
         sparse_matrix: bool = False,
         tracking_method: str = "simple_mixing",
         time_step: int = 3600,
+        run_composition_tracking: bool = True,
     ):
         self.network = network
         self.use_cuda = use_cuda
         self.sparse_matrix = sparse_matrix
         self.tracking_method = tracking_method
         self.time_step = time_step
+        # When False, composition is frozen during Newton iterations and
+        # initial_state skips the topological composition seeding. Used by
+        # the staggered coupler, which owns composition updates.
+        self.run_composition_tracking = run_composition_tracking
 
         # Derived index lists (computed once from the fixed network topology)
         non_junction_ids = set(network.non_junction_nodes)
@@ -112,11 +117,12 @@ class PressureProblem(Problem):
         if network.compressors is not None:
             network.update_compressor_parameters()
 
-        network.composition_initialization(
-            tracking_method=self.tracking_method,
-            time_step=self.time_step,
-            cached_batch_information=self._composition_tracker.cached_batch_information,
-        )
+        if self.run_composition_tracking:
+            network.composition_initialization(
+                tracking_method=self.tracking_method,
+                time_step=self.time_step,
+                cached_batch_information=self._composition_tracker.cached_batch_information,
+            )
 
         return self._full_p_to_x(p_full)
 
@@ -205,7 +211,8 @@ class PressureProblem(Problem):
 
         # 3. Composition tracking (single-pass, cached topological order)
         network.update_connection_flow_rate()
-        self._composition_tracker.update()
+        if self.run_composition_tracking:
+            self._composition_tracker.update()
 
         # 4. Compute nodal flow balance residual
         if self.use_cuda:

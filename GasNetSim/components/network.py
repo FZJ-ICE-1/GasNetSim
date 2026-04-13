@@ -592,6 +592,70 @@ class Network:
         self.update_connection_flow_rate()
         return nodal_composition
 
+    def _snapshot_nodal_eos_compositions(self):
+        return {
+            node_id: np.array(node.gas_mixture.eos_composition, copy=True)
+            for node_id, node in self.nodes.items()
+        }
+
+    def _refresh_network_state_from_gas_mixtures(self):
+        for node in self.nodes.values():
+            node.gas_mixture.pressure = node.pressure
+            node.gas_mixture.temperature = node.temperature
+            node.gas_mixture.update_gas_mixture()
+
+            if node.flow_type == "volumetric":
+                if node.volumetric_flow is not None:
+                    node.convert_volumetric_to_energy_flow()
+            elif node.flow_type == "energy":
+                if node.energy_flow is not None:
+                    node.convert_energy_to_volumetric_flow()
+            else:
+                raise ValueError(
+                    "Unknown flow type, can be only volumetric or energy!"
+                )
+
+        if self.pipelines is not None:
+            self.update_pipeline_parameters()
+        if self.resistances is not None:
+            self.update_resistance_parameters()
+        if self.compressors is not None:
+            self.update_compressor_parameters()
+
+        self.update_connection_flow_rate()
+
+    def _apply_relaxed_nodal_compositions(
+        self, previous_compositions, target_compositions, relaxation_factor
+    ):
+        if not 0 < relaxation_factor <= 1:
+            raise ValueError("composition_relaxation_factor must be in (0, 1].")
+
+        non_junction_nodes = set(self.non_junction_nodes)
+        max_delta = 0.0
+
+        for node_id, node in self.nodes.items():
+            previous = np.array(previous_compositions[node_id], copy=True)
+            target = np.array(target_compositions[node_id], copy=True)
+
+            if node_id in non_junction_nodes or relaxation_factor == 1.0:
+                relaxed = target
+            else:
+                relaxed = ((1 - relaxation_factor) * previous) + (
+                    relaxation_factor * target
+                )
+                composition_sum = relaxed.sum()
+                if composition_sum > 0:
+                    relaxed = relaxed / composition_sum
+
+            node.gas_mixture.eos_composition = relaxed.copy()
+            node.gas_mixture.eos_composition_tmp = relaxed.copy()
+            node.gas_mixture.convert_eos_composition_to_dictionary()
+
+            max_delta = max(max_delta, float(np.max(np.abs(relaxed - previous))))
+
+        self._refresh_network_state_from_gas_mixtures()
+        return max_delta
+
     def newton_raphson_initialization(self):
         """
         Initialization for NR-solver, where the nodal pressures are initialized as 0.98 of inlet pressure and nodal
@@ -914,7 +978,7 @@ class Network:
 
         return x
 
-    def simulation(
+    def _simulation_legacy(
         self,
         max_iter=100,
         tol=0.001,
@@ -965,3 +1029,188 @@ class Network:
             )
 
         return self
+
+    def _simulation_staggered(
+        self,
+        max_iter=100,
+        tol=0.001,
+        underrelaxation_factor=2.0,
+        use_cuda=False,
+        sparse_matrix=False,
+        tracking_method="simple_mixing",
+        time_step=3600,
+        solver=None,
+        coupling_max_iter=20,
+        coupling_tol=1e-4,
+        outer_pressure_tol=None,
+        composition_relaxation_factor=0.5,
+    ):
+        from GasNetSim.simulation.formulations import PressureProblem
+        from GasNetSim.simulation.solvers import NewtonRaphsonSolver
+
+        if tracking_method == "no_mixing":
+            return self._simulation_legacy(
+                max_iter=max_iter,
+                tol=tol,
+                underrelaxation_factor=underrelaxation_factor,
+                use_cuda=use_cuda,
+                sparse_matrix=sparse_matrix,
+                tracking_method=tracking_method,
+                time_step=time_step,
+                solver=solver,
+            )
+
+        if coupling_max_iter < 1:
+            raise ValueError("coupling_max_iter must be at least 1.")
+        if outer_pressure_tol is None:
+            outer_pressure_tol = max(10.0, tol * 1e5)
+        if solver is None:
+            solver = NewtonRaphsonSolver(
+                underrelaxation_factor=underrelaxation_factor
+            )
+
+        original_run_initialization = self.run_initialization
+        original_pressure_prev = copy.deepcopy(self.pressure_prev)
+        original_run_composition_initialization = (
+            self.run_composition_initialization
+        )
+
+        previous_pressure = None
+
+        try:
+            for outer_iter in range(1, coupling_max_iter + 1):
+                if outer_iter > 1:
+                    self.run_initialization = False
+                    self.pressure_prev = self.save_pressure_values()
+
+                inner_problem = PressureProblem(
+                    self,
+                    use_cuda=use_cuda,
+                    sparse_matrix=sparse_matrix,
+                    tracking_method="no_mixing",
+                    time_step=time_step,
+                    run_composition_tracking=False,
+                )
+
+                self.run_composition_initialization = False
+                self._simulation_legacy(
+                    max_iter=max_iter,
+                    tol=tol,
+                    underrelaxation_factor=underrelaxation_factor,
+                    use_cuda=use_cuda,
+                    sparse_matrix=sparse_matrix,
+                    tracking_method="no_mixing",
+                    time_step=time_step,
+                    problem=inner_problem,
+                    solver=solver,
+                )
+
+                current_pressure = np.array(self.save_pressure_values(), copy=True)
+                previous_composition = self._snapshot_nodal_eos_compositions()
+
+                self.run_composition_initialization = True
+                self.composition_initialization(
+                    tracking_method=tracking_method,
+                    time_step=time_step,
+                )
+                target_composition = self._snapshot_nodal_eos_compositions()
+                composition_delta = self._apply_relaxed_nodal_compositions(
+                    previous_composition,
+                    target_composition,
+                    composition_relaxation_factor,
+                )
+
+                if previous_pressure is None:
+                    pressure_delta = np.inf
+                else:
+                    pressure_delta = float(
+                        np.max(np.abs(current_pressure - previous_pressure))
+                    )
+
+                logger.info(
+                    "Staggered coupling iteration %d/%d: pressure delta %.3f Pa, composition delta %.3e",
+                    outer_iter,
+                    coupling_max_iter,
+                    pressure_delta,
+                    composition_delta,
+                )
+
+                if (
+                    previous_pressure is not None
+                    and pressure_delta <= outer_pressure_tol
+                    and composition_delta <= coupling_tol
+                ):
+                    logger.info(
+                        "Staggered coupling converges in %d iteration(s).",
+                        outer_iter,
+                    )
+                    return self
+
+                previous_pressure = current_pressure
+
+        finally:
+            self.run_initialization = original_run_initialization
+            self.pressure_prev = original_pressure_prev
+            self.run_composition_initialization = (
+                original_run_composition_initialization
+            )
+
+        raise RuntimeError(
+            "Staggered coupling not converged in "
+            f"{coupling_max_iter} iteration(s)!"
+        )
+
+    def simulation(
+        self,
+        max_iter=100,
+        tol=0.001,
+        underrelaxation_factor=2.0,
+        use_cuda=False,
+        sparse_matrix=False,
+        tracking_method="simple_mixing",
+        time_step=3600,
+        problem=None,
+        solver=None,
+        coupling_strategy="legacy",
+        coupling_max_iter=20,
+        coupling_tol=1e-4,
+        outer_pressure_tol=None,
+        composition_relaxation_factor=0.5,
+    ):
+        if coupling_strategy == "legacy":
+            return self._simulation_legacy(
+                max_iter=max_iter,
+                tol=tol,
+                underrelaxation_factor=underrelaxation_factor,
+                use_cuda=use_cuda,
+                sparse_matrix=sparse_matrix,
+                tracking_method=tracking_method,
+                time_step=time_step,
+                problem=problem,
+                solver=solver,
+            )
+        if coupling_strategy in ("staggered", "outer_picard"):
+            if problem is not None:
+                raise ValueError(
+                    "Custom problem instances are only supported with "
+                    "coupling_strategy='legacy'."
+                )
+            return self._simulation_staggered(
+                max_iter=max_iter,
+                tol=tol,
+                underrelaxation_factor=underrelaxation_factor,
+                use_cuda=use_cuda,
+                sparse_matrix=sparse_matrix,
+                tracking_method=tracking_method,
+                time_step=time_step,
+                solver=solver,
+                coupling_max_iter=coupling_max_iter,
+                coupling_tol=coupling_tol,
+                outer_pressure_tol=outer_pressure_tol,
+                composition_relaxation_factor=composition_relaxation_factor,
+            )
+
+        raise ValueError(
+            "Unknown coupling_strategy: "
+            f"{coupling_strategy!r}. Available: ['legacy', 'staggered']"
+        )
