@@ -494,11 +494,16 @@ def update_temporary_nodal_gas_mixture_properties(network, nodal_composition_mat
         nodal_composition_matrix: Matrix of nodal compositions
     """
     nodes = network.nodes
+    non_junction = network.non_junction_nodes
     for _i in range(nodal_composition_matrix.shape[1]):  # iterate over nodes
         if np.any(np.isnan(nodal_composition_matrix[:, _i])):  # No inflow
             pass
         else:
             node_id = network.simulation_node_index_to_node_id(_i)
+            # Preserve reference/supply node compositions — they define
+            # what gas enters the network.
+            if node_id in non_junction:
+                continue
             nodes[node_id].gas_mixture.eos_composition_tmp = nodal_composition_matrix[:, _i]
     return nodes
 
