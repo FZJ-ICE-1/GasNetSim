@@ -54,7 +54,23 @@ def read_nodes(path_to_file: Path, base_composition=None) -> dict[int, Node]:
     df_node = df_node.replace({np.nan: None})
 
     if base_composition is None:
-        base_composition = COMMON_GAS_COMPOSITIONS["NATURAL_GAS_gri30"]
+        # Infer the default from the first reference node so demand nodes start
+        # with gas properties consistent with the actual upstream supply.
+        for _, row in df_node.iterrows():
+            if (
+                row.get("node_type") == "reference"
+                and row["gas_composition"] is not None
+            ):
+                gas_composition_str = row["gas_composition"]
+                if "{" not in gas_composition_str and "}" not in gas_composition_str:
+                    base_composition = get_builtin_gas_composition(
+                        gas_composition_str
+                    )
+                else:
+                    base_composition = convert_gas_composition(gas_composition_str)
+                break
+        if base_composition is None:
+            base_composition = COMMON_GAS_COMPOSITIONS["NATURAL_GAS_gri30"]
 
     for _, row in df_node.iterrows():
         # Convert gauge pressure to absolute pressure
@@ -227,7 +243,10 @@ import warnings
 
 
 def create_network_from_csv(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path,
+    conversion_factor=1.0,
+    base_composition=None,
+    **network_kwargs,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
@@ -243,12 +262,18 @@ def create_network_from_csv(
         stacklevel=2,
     )
     return create_network_from_folder(
-        path_to_folder, conversion_factor, base_composition
+        path_to_folder,
+        conversion_factor,
+        base_composition,
+        **network_kwargs,
     )
 
 
 def create_network_from_folder(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path,
+    conversion_factor=1.0,
+    base_composition=None,
+    **network_kwargs,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
@@ -305,11 +330,14 @@ def create_network_from_folder(
         resistances=network_components["resistances"],
         linear_resistances=network_components["linear_resistances"],
         shortpipes=network_components["shortpipes"],
+        **network_kwargs,
     )
 
 
 def create_network_from_files(
-    component_files: dict[str, Path], conversion_factor=1.0
+    component_files: dict[str, Path],
+    conversion_factor=1.0,
+    **network_kwargs,
 ) -> Network:
     """
     Create a Network object from specified component CSV files.
@@ -365,4 +393,5 @@ def create_network_from_files(
         resistances=network_components["resistances"],
         linear_resistances=network_components["linear_resistances"],
         shortpipes=network_components["shortpipes"],
+        **network_kwargs,
     )
