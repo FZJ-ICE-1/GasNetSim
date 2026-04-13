@@ -357,20 +357,23 @@ def hybrid_initialization(network, strategy='auto'):
         raise ValueError(f"Unknown initialization strategy: {strategy}")
 
 
-def resistance_weighted_initialization(network):
+def resistance_weighted_initialization(network, max_pressure_drop: float = 0.5):
     """
     Initialize pressures by propagating from known-pressure nodes using a
     resistance-weighted pressure drop heuristic.
 
     For each connection the pressure of an unknown node is estimated as:
 
-        p_outlet = p_inlet * (1 - 0.5 * (res / max_res))
+        p_outlet = p_inlet * (1 - max_pressure_drop * (res / max_res))
 
     Shortpipes (zero resistance) get no pressure drop. Iteration continues
     until no pressure value changes (converged assignment).
 
     Args:
         network: Network object
+        max_pressure_drop: Maximum fractional pressure drop applied to the
+            highest-resistance pipe (default 0.5, i.e. 50%). Lower values
+            give a flatter initial guess; higher values spread pressures more.
 
     Returns:
         List of initial pressures for all nodes (simulation index order)
@@ -409,7 +412,7 @@ def resistance_weighted_initialization(network):
         for inlet_node_id, outlet_node_id, res in resistance:
             i = network.node_id_to_simulation_node_index(inlet_node_id)
             j = network.node_id_to_simulation_node_index(outlet_node_id)
-            drop = 0.5 * (res / max_resistance) if max_resistance > 0 else 0
+            drop = max_pressure_drop * (res / max_resistance) if max_resistance > 0 else 0
             if pressure_init[i] is None and pressure_init[j] is None:
                 pass
             elif pressure_init[j] is None or pressure_init[i] == pressure_init[j]:

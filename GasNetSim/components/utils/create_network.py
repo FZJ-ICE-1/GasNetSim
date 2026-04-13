@@ -227,7 +227,10 @@ import warnings
 
 
 def create_network_from_csv(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path,
+    conversion_factor=1.0,
+    base_composition=None,
+    **network_kwargs,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
@@ -243,12 +246,18 @@ def create_network_from_csv(
         stacklevel=2,
     )
     return create_network_from_folder(
-        path_to_folder, conversion_factor, base_composition
+        path_to_folder,
+        conversion_factor,
+        base_composition,
+        **network_kwargs,
     )
 
 
 def create_network_from_folder(
-    path_to_folder: Path, conversion_factor=1.0, base_composition=None
+    path_to_folder: Path,
+    conversion_factor=1.0,
+    base_composition=None,
+    **network_kwargs,
 ) -> Network:
     """
     Create a Network object from CSV files located in the specified folder.
@@ -305,11 +314,12 @@ def create_network_from_folder(
         resistances=network_components["resistances"],
         linear_resistances=network_components["linear_resistances"],
         shortpipes=network_components["shortpipes"],
+        **network_kwargs,
     )
 
 
 def create_network_from_files(
-    component_files: dict[str, Path], conversion_factor=1.0
+    component_files: dict[str, Path], conversion_factor=1.0, **network_kwargs
 ) -> Network:
     """
     Create a Network object from specified component CSV files.
@@ -365,4 +375,5 @@ def create_network_from_files(
         resistances=network_components["resistances"],
         linear_resistances=network_components["linear_resistances"],
         shortpipes=network_components["shortpipes"],
+        **network_kwargs,
     )

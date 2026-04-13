@@ -56,6 +56,7 @@ class Network:
         pressure_prev=None,
         base_composition=None,
         initialization_strategy='resistance_weighted',
+        initialization_kwargs=None,
     ):
         """
 
@@ -81,6 +82,7 @@ class Network:
         self.run_initialization = run_initialization
         self.pressure_prev = pressure_prev
         self.initialization_strategy = initialization_strategy
+        self.initialization_kwargs = initialization_kwargs or {}
 
         if base_composition is not None:
             self.base_composition = base_composition
@@ -436,7 +438,7 @@ class Network:
                 f"Unknown initialization strategy: '{self.initialization_strategy}'. "
                 f"Available: {list(INITIALIZATION_STRATEGIES.keys())}"
             )
-        return INITIALIZATION_STRATEGIES[self.initialization_strategy](self)
+        return INITIALIZATION_STRATEGIES[self.initialization_strategy](self, **self.initialization_kwargs)
 
     def newton_raphson_initialization(self):
         """
