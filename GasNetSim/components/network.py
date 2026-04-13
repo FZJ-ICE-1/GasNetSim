@@ -54,6 +54,7 @@ class Network:
         run_initialization=True,
         pressure_prev=None,
         base_composition=None,
+        run_composition_initialization=True,
     ):
         """
 
@@ -78,6 +79,7 @@ class Network:
         self.junction_nodes = self.find_junction_nodes()
         self.run_initialization = run_initialization
         self.pressure_prev = pressure_prev
+        self.run_composition_initialization = run_composition_initialization
 
         if base_composition is not None:
             self.base_composition = base_composition
@@ -521,6 +523,74 @@ class Network:
                     # pressure_init[i] = pressure_init[j] / 0.98
 
         return pressure_init
+
+    def composition_initialization(
+        self,
+        tracking_method="simple_mixing",
+        time_step=3600,
+        cached_batch_information=None,
+    ):
+        """
+        Seed nodal compositions by one topological propagation pass over the
+        initial flow-direction DAG. Skipped when
+        ``run_composition_initialization`` is False or when the network has no
+        connections.
+        """
+        if not self.run_composition_initialization:
+            return None
+        if self.connections is None or len(self.connections) == 0:
+            return None
+
+        from GasNetSim.simulation.formulations.composition_tracker import (
+            CompositionTracker,
+        )
+
+        if cached_batch_information is None:
+            if tracking_method == "batch_tracking" and self.pipelines is not None:
+                cached_batch_information = {
+                    i: (
+                        pipeline.batch_location_history.copy(),
+                        pipeline.composition_history.copy(),
+                    )
+                    for i, pipeline in self.pipelines.items()
+                }
+            else:
+                cached_batch_information = {}
+
+        for connection in self.connections.values():
+            connection.inlet = self.nodes[connection.inlet_index]
+            connection.outlet = self.nodes[connection.outlet_index]
+
+        self.update_connection_flow_rate()
+
+        tracker = CompositionTracker(
+            network=self,
+            tracking_method=tracking_method,
+            time_step=time_step,
+            cached_batch_information=cached_batch_information,
+        )
+        nodal_composition = tracker.update()
+
+        for node in self.nodes.values():
+            if node.index in self.non_junction_nodes:
+                node.gas_mixture.eos_composition_tmp = (
+                    node.gas_mixture.eos_composition.copy()
+                )
+            node.gas_mixture.eos_composition = node.gas_mixture.eos_composition_tmp.copy()
+            node.gas_mixture.convert_eos_composition_to_dictionary()
+            node.gas_mixture.pressure = node.pressure
+            node.gas_mixture.temperature = node.temperature
+            node.gas_mixture.update_gas_mixture()
+
+        if self.pipelines is not None:
+            self.update_pipeline_parameters()
+        if self.resistances is not None:
+            self.update_resistance_parameters()
+        if self.compressors is not None:
+            self.update_compressor_parameters()
+
+        self.update_connection_flow_rate()
+        return nodal_composition
 
     def newton_raphson_initialization(self):
         """
