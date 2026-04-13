@@ -144,6 +144,38 @@ class Pipeline:
         except:
             print("Error calculating the slope correction!")
 
+    def calc_slope_correction_pressure_derivative(self, is_inlet=True):
+        """
+        Derivative of slope correction with respect to inlet or outlet pressure.
+
+        Including dS/dp in the Jacobian improves Newton-Raphson convergence for
+        pipelines with significant elevation differences.
+
+        :param is_inlet: True for dS/dp1, False for dS/dp2
+        :return: dS/dp
+        """
+        h1 = self.inlet.altitude
+        h2 = self.outlet.altitude
+        if h1 == h2:
+            return 0.0
+
+        p1 = self.inlet.pressure
+        p2 = self.outlet.pressure
+        specific_gravity = self.gas_mixture.specific_gravity
+        z = self.gas_mixture.compressibility
+        avg_temperature = self.calc_average_temperature()
+        avg_pressure = self.calc_average_pressure()
+
+        alpha = 0.06835 * specific_gravity * (h2 - h1) / (z * avg_temperature)
+        p_sum = p1 + p2
+
+        if is_inlet:
+            dp_avg_dp = 2.0 / 3.0 * p1 * (p1 + 2.0 * p2) / p_sum**2
+        else:
+            dp_avg_dp = 2.0 / 3.0 * p2 * (p2 + 2.0 * p1) / p_sum**2
+
+        return alpha * 2.0 * avg_pressure * dp_avg_dp
+
     def calc_flow_velocity(self):
         """
         Calculate flow velocity in m/s
@@ -352,11 +384,12 @@ class Pipeline:
             self.calculate_coefficient_for_iteration() * self.conversion_factor
         )
         tmp = (abs(p1**2 - p2**2 - slope_corr)) ** (-0.5)
+        dsc_dp = self.calc_slope_correction_pressure_derivative(is_inlet)
 
         if is_inlet:
-            return pipeline_coefficient * p1 * tmp
+            return pipeline_coefficient * (p1 - dsc_dp / 2) * tmp
         else:
-            return pipeline_coefficient * p2 * tmp
+            return pipeline_coefficient * (p2 + dsc_dp / 2) * tmp
 
     def calc_gas_mass_flow(self):
         """
