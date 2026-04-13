@@ -114,13 +114,26 @@ def check_profiles(profiles):
 
 
 def run_snapshot(
-        network, tol=0.01, max_iter=100, use_cuda=False, tracking_method="simple_mixing", time_step=3600
+        network,
+        tol=0.01,
+        max_iter=100,
+        use_cuda=False,
+        tracking_method="simple_mixing",
+        time_step=3600,
+        underrelaxation_factor=2.0,
+        **simulation_kwargs,
 ):
     # plot_network_demand_distribution(network)
     if use_cuda:
         is_cuda_available()
     network = network.simulation(
-        tol=tol, max_iter=max_iter, use_cuda=use_cuda, tracking_method=tracking_method, time_step=time_step
+        tol=tol,
+        max_iter=max_iter,
+        use_cuda=use_cuda,
+        tracking_method=tracking_method,
+        time_step=time_step,
+        underrelaxation_factor=underrelaxation_factor,
+        **simulation_kwargs,
     )
     return network
 
@@ -179,14 +192,19 @@ def run_time_series(
         max_iter=100,
         time_step=3600,  # 1 hour
         tracking_method="simple_mixing",
+        underrelaxation_factor=2.0,
         save_to_file=True,
         output_format="excel",
         output_filename="time_series_results",
         results_to_save=["nodal_pressure", "pipeline_flowrate", "nodal_gas_composition"],
         use_cuda=False,
+        log_errors=True,
+        **simulation_kwargs,
 ):
     """
     Run time series simulation for the network and save results in specified format.
+
+    :param log_errors: If True, collect failed time steps in the error log.
     """
     # Validate results_to_save before running the simulation
     validate_results_to_save(results_to_save)
@@ -254,14 +272,17 @@ def run_time_series(
                     tol=tolerance,
                     max_iter=max_iter,
                     time_step=time_step,
+                    underrelaxation_factor=underrelaxation_factor,
                     use_cuda=use_cuda,
+                    **simulation_kwargs,
                 )
             )
             pressure_prev = full_network.save_pressure_values()
         except (RuntimeError, TypeError) as e:
             # error_log.append([simplified_network, profiles.iloc[t]])
             print(e)
-            error_log.append([e, full_network, profiles.loc[t]])
+            if log_errors:
+                error_log.append([e, full_network, profiles.loc[t]])
 
         results = save_time_series_results(full_network, results, results_to_save)
     # Save simulation results to file
@@ -269,6 +290,18 @@ def run_time_series(
         save_time_series_results_to_file(
             results, time_steps, output_format, output_filename
         )
+
+    if log_errors and error_log:
+        error_log_filename = f"{output_filename}_error_log.txt"
+        with open(error_log_filename, "w") as f:
+            f.write(f"Error Log - {len(error_log)} errors occurred\n")
+            f.write("=" * 80 + "\n\n")
+            for idx, error_info in enumerate(error_log, 1):
+                f.write(f"Error {idx}:\n")
+                f.write(f"  Exception: {error_info[0]}\n")
+                f.write(f"  Time step: {error_info[2].name}\n")
+                f.write("-" * 80 + "\n")
+        print(f"Error log saved to {error_log_filename}")
 
     return results
 
