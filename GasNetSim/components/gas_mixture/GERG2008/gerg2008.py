@@ -7,6 +7,10 @@
 #     Last change by yifei
 #    *****************************************************************************
 
+# This file contains software originally developed by employees of the National
+# Institute of Standards and Technology (NIST). See the NOTICE file at the root
+# of this repository for the full NIST license and disclaimer of warranty.
+#
 # """
 # Version 2.01 of routines for the calculation of thermodynamic
 # properties from the AGA 8 Part 2 GERG-2008 equation of state.
