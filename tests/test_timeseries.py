@@ -26,6 +26,8 @@ from GasNetSim import (
     run_time_series,
     save_time_series_results,
 )
+from GasNetSim.simulation.timeseries import read_profiles, check_profiles
+from pathlib import Path
 
 
 class BaseTestNetwork(unittest.TestCase):
@@ -67,6 +69,7 @@ class BaseTestNetwork(unittest.TestCase):
 
         # Create pipelines
         self.pipe1 = Pipeline(
+            pipeline_index=1,
             inlet=self.node1,
             outlet=self.node2,
             diameter=0.5,
@@ -74,6 +77,7 @@ class BaseTestNetwork(unittest.TestCase):
             efficiency=0.85,
         )
         self.pipe2 = Pipeline(
+            pipeline_index=2,
             inlet=self.node2,
             outlet=self.node3,
             diameter=0.5,
@@ -81,6 +85,7 @@ class BaseTestNetwork(unittest.TestCase):
             efficiency=0.85,
         )
         self.pipe3 = Pipeline(
+            pipeline_index=3,
             inlet=self.node1,
             outlet=self.node3,
             diameter=0.5,
@@ -96,28 +101,135 @@ class BaseTestNetwork(unittest.TestCase):
         self.network.reference_nodes = [1]  # Node 1 is the reference node
 
 
-class MockProfiles:
-    """Mock profiles to simulate time-series data for tests."""
-
-    def __init__(self, values=None, nodes=None):
-        self.values = values or [
-            [20, 30],
-            [25, 35],
-            [30, 40],
-            [35, 45],
-            [40, 50],
-        ]
-        self.df = pd.DataFrame(self.values, columns=[2, 3])
-
-    def __getitem__(self, key):
-        return self.df[key]
-
-    def iloc(self, t):
-        return self.df.iloc[t]
-
-    @property
-    def index(self):
-        return self.df.index
+class TestProfileReading(unittest.TestCase):
+    """Test cases for profile reading and validation functions."""
+    
+    def setUp(self):
+        """Set up test paths to profile test data."""
+        self.test_data_path = Path(__file__).parent / "data" / "profiles"
+        
+    def test_read_basic_profiles(self):
+        """Test reading basic profiles without time column."""
+        profiles = read_profiles(self.test_data_path / "basic_profiles.csv")
+        
+        # Check structure
+        self.assertIsInstance(profiles, pd.DataFrame)
+        self.assertEqual(list(profiles.columns), [2, 3])
+        self.assertEqual(len(profiles), 5)
+        
+        # Check values
+        self.assertEqual(profiles.iloc[0, 0], 20)  # First row, first column
+        self.assertEqual(profiles.iloc[0, 1], 30)  # First row, second column
+        self.assertEqual(profiles.iloc[-1, 0], 40)  # Last row, first column
+        self.assertEqual(profiles.iloc[-1, 1], 50)  # Last row, second column
+        
+    def test_read_profiles_with_time_integer(self):
+        """Test reading profiles with integer time column."""
+        profiles = read_profiles(self.test_data_path / "profiles_with_time.csv")
+        
+        # Check structure
+        self.assertIsInstance(profiles, pd.DataFrame)
+        self.assertIn("time", profiles.columns)
+        self.assertEqual(set(profiles.columns), {"time", 2, 3})
+        
+        # Check time values
+        self.assertEqual(profiles["time"].iloc[0], 0)
+        self.assertEqual(profiles["time"].iloc[1], 3600)
+        
+    def test_read_profiles_with_datetime(self):
+        """Test reading profiles with datetime time column."""
+        profiles = read_profiles(self.test_data_path / "profiles_with_datetime.csv")
+        
+        # Check structure  
+        self.assertIsInstance(profiles, pd.DataFrame)
+        self.assertIn("time", profiles.columns)
+        
+        # Check that time column is parsed correctly
+        # Note: the exact parsing depends on pandas version, but it should be time-like
+        self.assertTrue(len(profiles["time"]) > 0)
+        
+    def test_read_profiles_with_unnamed_index(self):
+        """Test reading profiles with 'Unnamed: 0' index column."""
+        profiles = read_profiles(self.test_data_path / "profiles_with_unnamed_index.csv")
+        
+        # Check that Unnamed: 0 column is handled
+        self.assertNotIn("Unnamed: 0", profiles.columns)
+        self.assertEqual(list(profiles.columns), [2, 3])
+        self.assertEqual(len(profiles), 5)
+        
+    def test_read_empty_profiles_file(self):
+        """Test reading empty profiles file raises appropriate error."""
+        with self.assertRaises(ValueError) as cm:
+            read_profiles(self.test_data_path / "empty_profiles.csv")
+        self.assertIn("contains no data", str(cm.exception))
+            
+    def test_read_nonexistent_file(self):
+        """Test reading nonexistent file raises FileNotFoundError."""
+        with self.assertRaises(FileNotFoundError):
+            read_profiles(self.test_data_path / "nonexistent_file.csv")
+            
+    def test_check_profiles_without_time(self):
+        """Test check_profiles with DataFrame without time column."""
+        df = pd.DataFrame({2: [20, 25, 30], 3: [30, 35, 40]})
+        result = check_profiles(df)
+        
+        # Should return DataFrame unchanged
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertEqual(list(result.columns), [2, 3])
+        
+    def test_check_profiles_with_integer_time(self):
+        """Test check_profiles with integer time column."""
+        df = pd.DataFrame({
+            "time": [0, 3600, 7200],
+            2: [20, 25, 30],
+            3: [30, 35, 40]
+        })
+        result = check_profiles(df)
+        
+        # Should convert time to datetime and set as index
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertNotIn("time", result.columns)  # Should be moved to index
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(result.index))
+        self.assertEqual(list(result.columns), [2, 3])
+        
+    def test_check_profiles_with_datetime_time(self):
+        """Test check_profiles with datetime time column."""
+        df = pd.DataFrame({
+            "time": pd.to_datetime(["2024-01-01 00:00:00", "2024-01-01 01:00:00"]),
+            2: [20, 25],
+            3: [30, 35]
+        })
+        result = check_profiles(df)
+        
+        # Should set time as index
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertNotIn("time", result.columns)  # Should be moved to index
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(result.index))
+        
+    def test_check_profiles_with_invalid_time(self):
+        """Test check_profiles with invalid time column raises error."""
+        df = pd.DataFrame({
+            "time": ["invalid", "time", "data"],
+            2: [20, 25, 30],
+            3: [30, 35, 40]
+        })
+        with self.assertRaises(ValueError) as cm:
+            check_profiles(df)
+        self.assertIn("time", str(cm.exception).lower())
+        
+    def test_integrated_read_and_check_profiles(self):
+        """Test integrated workflow of reading and checking profiles."""
+        # Read profiles with time
+        profiles = read_profiles(self.test_data_path / "profiles_with_time.csv")
+        
+        # Check/validate profiles  
+        checked_profiles = check_profiles(profiles)
+        
+        # Verify integrated result
+        self.assertIsInstance(checked_profiles, pd.DataFrame)
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(checked_profiles.index))
+        self.assertEqual(list(checked_profiles.columns), [2, 3])
+        self.assertEqual(len(checked_profiles), 5)
 
 
 class TestValidateResultsToSave(BaseTestNetwork):
@@ -186,6 +298,7 @@ class TestSaveTimeSeriesResults(BaseTestNetwork):
                     ],
                     columns=[2, 3],
                 ),
+                profile_type="volumetric",  # Fix: specify that profiles contain volumetric flows
                 results_to_save=results_to_save,
                 output_format="csv",
                 output_filename=os.path.join(tmpdirname, "test_output"),

@@ -17,7 +17,7 @@ LAMINAR_FLOW_THRESHOLD = 2100
 AIR_DENSITY = 1.225  # Density of air at standard conditions (kg/m3)
 
 
-@njit(float64(float64, float64, float64, float64))
+@njit(float64(float64, float64, float64, float64), cache=True, nogil=True)
 def reynolds_number(diameter, velocity, rho, viscosity):
     """
     Calculate the Reynolds number.
@@ -31,7 +31,7 @@ def reynolds_number(diameter, velocity, rho, viscosity):
     return (diameter * abs(velocity) * rho) / viscosity
 
 
-@njit(float64(float64, float64, float64, float64, float64))
+@njit(float64(float64, float64, float64, float64, float64), cache=True, nogil=True)
 def reynolds_number_simple(diameter, p, sg, q, viscosity):
     """
     A simplified method to calculate the Reynolds number based on the volumetric flow rate.
@@ -48,7 +48,7 @@ def reynolds_number_simple(diameter, p, sg, q, viscosity):
     return re
 
 
-@njit(float64(float64))
+@njit(float64(float64), cache=True, nogil=True)
 def hagen_poiseuille(N_re):
     """
     Friction factor in Laminar zone using Hagen-Poiseuille method.
@@ -56,10 +56,12 @@ def hagen_poiseuille(N_re):
     :param N_re: Reynolds number (dimensionless)
     :return: Friction factor (dimensionless)
     """
+    if N_re == 0:
+        return np.inf
     return 64 / N_re
 
 
-@njit(float64(float64, float64))
+@njit(float64(float64, float64), cache=True, nogil=True)
 def nikuradse(d, epsilon):
     """
     Calculate friction factor using Nikuradse method.
@@ -109,7 +111,7 @@ def colebrook_white(epsilon, d, N_re):
     return friction_factor
 
 
-@njit(float64(float64, float64, float64))
+@njit(float64(float64, float64, float64), cache=True, nogil=True)
 def colebrook_white_hofer_approximation(N_re, d, epsilon):
     """
     Hofer approximation for Colebrook-White for friction factor calculation.
@@ -124,7 +126,7 @@ def colebrook_white_hofer_approximation(N_re, d, epsilon):
     )
 
 
-@njit(float64(float64, float64))
+@njit(float64(float64, float64), cache=True, nogil=True)
 def nikuradse_from_CWH(epsilon, d):
     """
     Calculate friction factor using the Hofer approximation Re -> inf.
@@ -136,7 +138,7 @@ def nikuradse_from_CWH(epsilon, d):
     return (-2 * np.log10(epsilon / (3.71 * d))) ** (-2)
 
 
-@njit(float64(float64, float64, float64))
+@njit(float64(float64, float64, float64), cache=True, nogil=True)
 def chen(epsilon, d, N_re):
     """
     Calculate friction factor using the Chen equation.
@@ -158,7 +160,7 @@ def chen(epsilon, d, N_re):
     return _friction_factor
 
 
-@njit(float64(float64))
+@njit(float64(float64), cache=True, nogil=True)
 def weymouth(d):
     """
     Weymouth friction factor calculation.

@@ -55,7 +55,7 @@ def test_network_volume_flow_rate_balance():
     # Create a network instance with Irish13
     # Initialize the network with nodes and connections from a CSV file in the current directory
     # network = gns.create_network_from_csv(Path('../examples/Irish13/.'))
-    network = gns.create_network_from_csv(Path(new_path))
+    network = gns.create_network_from_folder(Path(new_path))
 
     # Simulate the network to compute the pressures and flows
     network.simulation(tol=0.0000001)
@@ -134,7 +134,7 @@ def test_network_energy_flow_balance():
     # Create a network instance with Irish13
     # Initialize the network with nodes and connections from a CSV file in the current directory
     # network = gns.create_network_from_csv(Path('../examples/Irish13/.'))
-    network = gns.create_network_from_csv(Path(new_path))
+    network = gns.create_network_from_folder(Path(new_path))
 
     # Simulate the network to compute the pressures and flows
     network.simulation(tol=0.0000001)
@@ -197,7 +197,7 @@ def test_network_composition_balance():
     # Create a network instance with Irish13
     # Initialize the network with nodes and connections from a CSV file in the current directory
     # network = gns.create_network_from_csv(Path('../examples/Irish13/.'))
-    network = gns.create_network_from_csv(Path(new_path))
+    network = gns.create_network_from_folder(Path(new_path))
 
     # Simulate the network to compute the pressures and flows
     network.simulation(tol=0.0000001)

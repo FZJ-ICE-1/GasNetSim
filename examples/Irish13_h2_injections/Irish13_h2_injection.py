@@ -6,5 +6,5 @@ from pathlib import Path
 
 import GasNetSim as gns
 
-network = gns.create_network_from_csv(Path("."))
+network = gns.create_network_from_folder(Path("."))
 network.simulation()

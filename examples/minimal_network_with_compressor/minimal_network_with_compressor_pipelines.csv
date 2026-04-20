@@ -1,0 +1,4 @@
+pipeline_index;inlet_index;outlet_index;diameter_m;length_m;roughness;efficiency
+1;1;2;0.5;200000;0.000015;0.85
+2;3;4;0.5;400000;0.000015;0.85
+3;1;4;0.5;100000;0.000015;0.85

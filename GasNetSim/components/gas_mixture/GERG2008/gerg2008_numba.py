@@ -15,22 +15,22 @@ from numba.extending import overload
 from .gerg2008_constants import *
 
 
-@njit(float64(float64), fastmath=True)
+@njit(float64(float64), fastmath=True, cache=True, nogil=True)
 def Tanh_numba(xx):
     return (math.exp(xx) - math.exp(-xx)) / (math.exp(xx) + math.exp(-xx))
 
 
-@njit(float64(float64), fastmath=True)
+@njit(float64(float64), fastmath=True, cache=True, nogil=True)
 def Sinh_numba(xx):
     return (math.exp(xx) - math.exp(-xx)) / 2
 
 
-@njit(float64(float64), fastmath=True)
+@njit(float64(float64), fastmath=True, cache=True, nogil=True)
 def Cosh_numba(xx):
     return (math.exp(xx) + math.exp(-xx)) / 2
 
 
-@njit(float64(float64[:]), fastmath=True)
+@njit(float64(float64[:]), fastmath=True, cache=True, nogil=True)
 def MolarMassGERG_numba(x):
     """
     Calculate the molar mass of a gas mixture using GERG-2008 reference equation.
@@ -50,7 +50,7 @@ def MolarMassGERG_numba(x):
     return Mm
 
 
-@njit(types.UniTuple(float64, 2)(float64[:]))
+@njit(types.UniTuple(float64, 2)(float64[:]), cache=True, nogil=True)
 def PseudoCriticalPointGERG_numba(x):
     """
     Calculate a pseudo critical point as the mole fraction average of the critical temperatures and volumes.
@@ -79,7 +79,7 @@ def PseudoCriticalPointGERG_numba(x):
     return Tcx, Dcx
 
 
-@njit
+@njit(cache=True, nogil=True)
 def ReducingParametersGERG_numba(x):
     """
     Function to calculate reducing parameters in GERG equation of state.
@@ -103,7 +103,7 @@ def ReducingParametersGERG_numba(x):
     return Tr, Dr
 
 
-@njit(types.UniTuple(float64, 2)(float64[:]))
+@njit(types.UniTuple(float64, 2)(float64[:]), cache=True, nogil=True)
 def ReducingParametersGERG_numba_sub(x):
     """
     Sub-function to calculate reducing parameters in GERG equation of state.
@@ -146,7 +146,159 @@ def ReducingParametersGERG_numba_sub(x):
     return Tr, Dr
 
 
-@njit(float64(float64, float64[:]))
+# def ConvertCompositionGERG_numba(composition):
+#     pass
+#
+#
+# # @staticmethod
+# @overload(ConvertCompositionGERG_numba)
+# def ConvertCompositionGERG_numba(composition):
+#     """
+#         Converts a dictionary representing gas compositions into a GERG composition list.
+#         https://numba.readthedocs.io/en/stable/reference/pysupported.html#typed-dict
+#
+#         Inputs:
+#             composition (dict): A dictionary containing gas species and their compositions.
+#
+#         return:
+#             gerg_composition (list): A list representing the GERG composition of gases.
+#     """
+#     gerg_composition = np.zeros(21)
+#     global gerg_gas_spices
+#
+#     for gas_spice, composition in composition.items():
+#         gerg_composition[np.where(gerg_gas_spices == gas_spice)] = composition
+#
+#     return np.array(gerg_composition)
+
+
+@njit(float64(float64, float64, float64[:], boolean, boolean, float64), cache=True, nogil=True)
+def CalculateHeatingValue_numba(
+    MolarMass, MolarDensity, comp, hhv, per_mass, reference_temp
+):
+    """
+    Calculate the heating value of a gas mixture based on its composition and other properties.
+
+    Inputs:
+        MolarMass (float64): The molar mass of the gas mixture.
+        MolarDensity (float64): The molar density of the gas mixture.
+        comp (np.array): A dictionary representing the composition of the gas mixture.
+        hhv (bool): True for Higher Heating Value (HHV) calculation, False for Lower Heating Value (LHV) calculation.
+        per_mass (bool): Specifies the parameter for heating value calculation. Options: 'mass' or 'volume'.
+        reference_temp (float64): The reference temperature for the heating value calculation. Default is 25 degree Celsius.
+
+    return:
+        heating_value (float64): The calculated heating value based on the provided parameters.
+    """
+    # 298 K
+    # dict_enthalpy_mole = {'methane': -74602.416533355,
+    #                       'nitrogen': 0.0,
+    #                       'carbon dioxide': -393517.79827154,
+    #                       'ethane': -83856.2627150042,
+    #                       'propane': -103861.117481869,
+    #                       'isobutane': -135360.0,
+    #                       'n-butane': -125849.99999999999,
+    #                       'isopentane': -178400.0,
+    #                       'n-pentane': -173500.0,
+    #                       'n-hexane': -198490.0,
+    #                       'n-heptane': -223910.0,
+    #                       'n-hctane': -249730.0,
+    #                       'n-nonane': -274700.0,
+    #                       'n-decane': -300900.0,
+    #                       'hydrogen': 0.0,
+    #                       'oxygen': -4.40676212751828,
+    #                       'carbon monoxide': -110525.0,
+    #                       'water': -241833.418361837,
+    #                       'hydrogen sulfide': -20600.0,
+    #                       'helium': 0.0,
+    #                       'argon': 0.0,
+    #                       'carbon': 0.0}
+    #                       # 'H': 218000.0,
+    #                       # 'O': 249190.0,
+    #                       # 'SO2': -296840.0}
+
+    # 273 K
+    enthalpy_mole = np.array(
+        [
+            -75483.51423273719,  # methane
+            0.0,  # nitrogen
+            -394431.82606764464,  # carbon dioxide
+            -83856.2627150042,  # ethane
+            -103861.117481869,  # propane
+            -135360.0,  # isobutane
+            -125849.99999999999,  # n-butane
+            -178400.0,  # isopentane
+            -173500.0,  # n-pentane
+            -198490.0,  # n-hexane
+            -223910.0,  # n-heptane
+            -249730.0,  # n-octane
+            -274700.0,  # n-nonane
+            -300900.0,  # n-decane
+            0.0,  # hydrogen
+            -4.40676212751828,  # oxygen
+            -111262.34509634285,  # carbon monoxide
+            -242671.7203547155,  # water
+            -20600.0,  # hydrogen sulfide
+            0.0,  # helium
+            0.0,  # argon
+            -296840.0,
+        ]
+    )  # sulfur dioxide
+
+    atom_list = number_of_atoms * comp[:, np.newaxis]
+    reactants_atom = np.sum(atom_list, axis=0)
+
+    # products
+    n_CO2 = reactants_atom[1]
+    n_SO2 = reactants_atom[6]
+    n_H2O = reactants_atom[2] / 2
+    products_dict = np.array([n_CO2, n_SO2, n_H2O])
+
+    # oxygen for complete combustion
+    n_O = (
+        n_CO2 * 2 + n_SO2 * 2 + n_H2O * 1
+    )  # 2 is number of O atoms in CO2 AND SO2 and 1 is number of O atoms in H2O
+    n_O2 = n_O / 2
+    reactants_dict = np.copy(comp)
+    reactants_dict[15] = n_O2
+    # reactants_dict.update({'oxygen': n_O2})
+
+    # LHV calculation
+    LHV = (reactants_dict * enthalpy_mole[:-1]).sum() - (
+        products_dict * np.take(enthalpy_mole, [2, 21, 17])
+    ).sum()
+
+    # enthalpy of formation of water at different temperatures, data obtained using cantera
+    supported_temps = [25.0, 15.0]
+
+    if reference_temp == 25.0:
+        hw_liq, hw_gas = -285839.09854950657, -241824.62162536496
+    elif reference_temp == 15.0:
+        hw_liq, hw_gas = -286593.59823661513, -242160.26451330166
+    else:
+        print(
+            f"Unsupported reference temperature: {reference_temp} degree Celsius. Use one of {supported_temps}."
+        )
+
+    HHV = LHV + (hw_gas - hw_liq) * products_dict[2]
+
+    if per_mass:
+        # returns heating value in J/kg
+        if hhv:
+            heating_value = HHV / MolarMass * 1e3
+        else:
+            heating_value = LHV / MolarMass * 1e3
+    else:
+        # returns heating value in J/m3
+        if hhv:
+            heating_value = HHV * MolarDensity * 1e3
+        else:
+            heating_value = LHV * MolarDensity * 1e3
+
+    return heating_value
+
+
+@njit(float64(float64, float64[:]), cache=True, nogil=True)
 def CalculateCO2Emission_numba(MolarMass, x):
     """
     Calculate the heating value of a gas mixture based on its composition and other properties.
@@ -172,7 +324,7 @@ def CalculateCO2Emission_numba(MolarMass, x):
     return n_CO2 * 44.01 / MolarMass
 
 
-@njit(float64[:](float64, float64, float64[:]))
+@njit(float64[:](float64, float64, float64[:]), cache=True, nogil=True)
 def Alpha0GERG_numba(Temp, MolarDensity, X):
     """
     Private Sub Alpha0GERG(T, D, x, a0)
@@ -237,7 +389,7 @@ def Alpha0GERG_numba(Temp, MolarDensity, X):
     return a0
 
 
-@njit
+@njit(cache=True, nogil=True)
 def tTermsGERG_numba(lntau, x):
     """
     Private Sub tTermsGERG(lntau, x)
@@ -253,7 +405,7 @@ def tTermsGERG_numba(lntau, x):
     return taup, taupijk
 
 
-@njit
+@njit(cache=True, nogil=True)
 def tTermsGERG_numba_sub(lntau, x):
     """
     Calculate temperature-dependent parts of the GERG-2008 equation of state.
@@ -305,7 +457,7 @@ def tTermsGERG_numba_sub(lntau, x):
 
 
 # @overload(AlpharGERG_numba)
-@njit(float64[:, :](float64, float64[:], int32, int32, float64), fastmath=True)
+@njit(float64[:, :](float64, float64[:], int32, int32, float64), fastmath=True, cache=True, nogil=True)
 def AlpharGERG_numba(T, x, itau, idelta, D):
     """
     Private Sub AlpharGERG(itau, idelta, T, D, x, ar)
@@ -451,7 +603,7 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
     return ar
 
 
-@njit(types.UniTuple(float64, 3)(float64, float64, float64[:]))
+@njit(types.UniTuple(float64, 3)(float64, float64, float64[:]), cache=True, nogil=True)
 def PressureGERG_numba(T, D, x):
     """
     Sub PressureGERG(T, D, x, P, Z)
@@ -480,7 +632,7 @@ def PressureGERG_numba(T, D, x):
 
 # @njit(types.Tuple((float64, types.unicode_type, float64))(float64[:, :], float64, float64, float64[:], int64))
 # Tha above did not work since there is an empty return happening.
-@njit
+@njit(cache=True, nogil=True)
 def DensityGERG_numba(P, T, x, iFlag=0):
     """
     Sub DensityGERG(iFlag, T, P, x, D, ierr, herr)
@@ -526,7 +678,7 @@ def DensityGERG_numba(P, T, x, iFlag=0):
     iFail = 0
     if P < epsilon:
         D = 0
-        return
+        return ierr, herr, D
     tolr = 0.0000001
     Tcx, Dcx = PseudoCriticalPointGERG_numba(x)
 
@@ -618,7 +770,7 @@ def DensityGERG_numba(P, T, x, iFlag=0):
 #     pass
 
 
-@njit(types.UniTuple(float64, 20)(float64, float64, float64[:]))
+@njit(types.UniTuple(float64, 20)(float64, float64, float64[:]), cache=True, nogil=True)
 def PropertiesGERG_numba(T, P, x):
     """
     Sub PropertiesGERG(T, D, x, P, Z, dPdD, d2PdD2, d2PdTD, dPdT, U, H, S, Cv, Cp, W, G, JT, Kappa, A)
@@ -722,71 +874,71 @@ def PropertiesGERG_numba(T, P, x):
 
 
 # Assuming necessary helper functions like MolarMassGERG_numba, DensityGERG_numba, etc., are available
-@njit(float64(float64[:]))
+@njit(float64(float64[:]), cache=True, nogil=True)
 def molar_mass_numba(x):
     return MolarMassGERG_numba(x)
 
 
-@njit(float64(float64, float64, float64[:]))
+@njit(float64(float64, float64, float64[:]), cache=True, nogil=True)
 def density_numba(P, T, x):
     ierr, herr, D = DensityGERG_numba(P, T, x, iFlag=0)
     return D
 
 
-@njit(types.Tuple((float64[:], float64[:, :]))(float64, float64, float64[:]))
+@njit(types.Tuple((float64[:], float64[:, :]))(float64, float64, float64[:]), cache=True, nogil=True)
 def common_properties_numba(T, D, x):
     a0 = Alpha0GERG_numba(T, D, x)
     ar = AlpharGERG_numba(T, x, itau=1, idelta=0, D=D)
     return a0, ar
 
 
-@njit(float64(float64[:, :]))
+@njit(float64(float64[:, :]), cache=True, nogil=True)
 def compressibility_factor_numba(ar):
     return 1 + ar[0][1]
 
 
-@njit(float64(float64, float64, float64, float64))
+@njit(float64(float64, float64, float64, float64), cache=True, nogil=True)
 def pressure_numba(D, R, T, Z):
     return D * R * T * Z
 
 
-@njit(float64(float64, float64, float64[:, :]))
+@njit(float64(float64, float64, float64[:, :]), cache=True, nogil=True)
 def first_derivative_pressure_density_numba(R, T, ar):
     return R * T * (1 + 2 * ar[0][1] + ar[0][2])
 
 
-@njit(float64(float64, float64, float64[:, :]))
+@njit(float64(float64, float64, float64[:, :]), cache=True, nogil=True)
 def first_derivative_pressure_temperature_numba(R, D, ar):
     return D * R * (1 + ar[0][1] - ar[1][1])
 
 
-@njit(float64(float64, float64, float64, float64[:, :]))
+@njit(float64(float64, float64, float64, float64[:, :]), cache=True, nogil=True)
 def second_derivative_pressure_temperature_density_numba(R, T, D, ar):
     return R * T * (2 * ar[0][1] + 4 * ar[0][2] + ar[0][3]) / D
     # return R * (1 + 2 * ar[0][1] + ar[0][2] - 2 * ar[1][1] - ar[1][2])
 
 
-@njit(float64(float64, float64, float64[:], float64[:, :]))
+@njit(float64(float64, float64, float64[:], float64[:, :]), cache=True, nogil=True)
 def internal_energy_numba(R, T, a0, ar):
     return R * T * (a0[1] + ar[1][0])
 
 
-@njit(float64(float64, float64, float64[:], float64[:, :]))
+@njit(float64(float64, float64, float64[:], float64[:, :]), cache=True, nogil=True)
 def enthalpy_numba(R, T, a0, ar):
     return R * T * (1 + ar[0][1] + a0[1] + ar[1][0])
 
 
-@njit(float64(float64, float64[:], float64[:, :]))
+@njit(float64(float64, float64[:], float64[:, :]), cache=True, nogil=True)
 def entropy_numba(R, a0, ar):
     return R * (a0[1] + ar[1][0] - a0[0] - ar[0][0])
 
 
-@njit(float64(float64, float64[:], float64[:, :]))
+@njit(float64(float64, float64[:], float64[:, :]), cache=True, nogil=True)
 def isochoric_heat_capacity_numba(R, a0, ar):
     return -R * (a0[2] + ar[2][0])
 
 
-@njit(float64(float64, float64, float64, float64[:], float64[:, :]))
+@njit(float64(float64, float64, float64, float64[:], float64[:, :]), cache=True, nogil=True)
 def isobaric_heat_capacity_numba(T, D, R, a0, ar):
     Cv = -R * (a0[2] + ar[2][0])
     dPdT = D * R * (1 + ar[0][1] - ar[1][1])
@@ -797,7 +949,7 @@ def isobaric_heat_capacity_numba(T, D, R, a0, ar):
         return Cv + R
 
 
-@njit(float64(float64, float64, float64, float64[:], float64[:, :], float64[:]))
+@njit(float64(float64, float64, float64, float64[:], float64[:, :], float64[:]), cache=True, nogil=True)
 def speed_of_sound_numba(T, D, R, a0, ar, x):
     Cp = isobaric_heat_capacity_numba(T, D, R, a0, ar)
     Cv = isochoric_heat_capacity_numba(R, a0, ar)
@@ -809,12 +961,12 @@ def speed_of_sound_numba(T, D, R, a0, ar, x):
     return math.sqrt(W)
 
 
-@njit(float64(float64, float64, float64[:], float64[:, :]))
+@njit(float64(float64, float64, float64[:], float64[:, :]), cache=True, nogil=True)
 def gibbs_energy_numba(R, T, a0, ar):
     return R * T * (1 + ar[0][1] + a0[0] + ar[0][0])
 
 
-@njit(float64(float64, float64, float64, float64, float64[:], float64[:, :]))
+@njit(float64(float64, float64, float64, float64, float64[:], float64[:, :]), cache=True, nogil=True)
 def joule_thomson_coefficient_numba(T, D, epsilon, R, a0, ar):
     Cp = isobaric_heat_capacity_numba(T, D, R, a0, ar)
     dPdT = first_derivative_pressure_temperature_numba(R, D, ar)
@@ -825,7 +977,7 @@ def joule_thomson_coefficient_numba(T, D, epsilon, R, a0, ar):
         return 1e20
 
 
-@njit(float64(float64, float64, float64, float64[:], float64[:, :], float64[:]))
+@njit(float64(float64, float64, float64, float64[:], float64[:, :], float64[:]), cache=True, nogil=True)
 def isentropic_exponent_numba(T, D, R, a0, ar, x):
     W = speed_of_sound_numba(T, D, R, a0, ar, x)
     molar_mass = molar_mass_numba(x)
@@ -833,7 +985,7 @@ def isentropic_exponent_numba(T, D, R, a0, ar, x):
     return W**2 * molar_mass / (R * T * 1000 * Z)
 
 
-@njit(float64(float64, float64, float64[:]))
+@njit(float64(float64, float64, float64[:]), cache=True, nogil=True)
 def molar_volume_numba(T, P, x):
     D = density_numba(P, T, x)
     molar_mass = molar_mass_numba(x)
@@ -843,13 +995,13 @@ def molar_volume_numba(T, P, x):
     return molar_mass * P / (Z * R * T)
 
 
-@njit(float64(float64[:]))
+@njit(float64(float64[:]), cache=True, nogil=True)
 def molar_mass_ratio_numba(x):
     molar_mass = molar_mass_numba(x)
     return molar_mass / air_molar_mass
 
 
-@njit(float64(float64[:]))
+@njit(float64(float64[:]), cache=True, nogil=True)
 def specific_gas_constant_numba(x):
     R = RGERG
     molar_mass = molar_mass_numba(x)

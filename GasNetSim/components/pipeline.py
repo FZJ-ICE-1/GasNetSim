@@ -27,12 +27,13 @@ class Pipeline:
 
     def __init__(
         self,
+        pipeline_index: int,
         inlet: Node,
         outlet: Node,
         diameter,
         length,
         efficiency=0.85,
-        roughness=0.000015,
+        roughness=0.000015,  # 0.015 mm
         ambient_temp=15 + zero_Celsius,
         ambient_pressure=1 * atm,
         heat_transfer_coefficient=3.69,
@@ -51,7 +52,7 @@ class Pipeline:
         :param ambient_temp: Pipe surrounding temperature [K]
         :param ambient_pressure: Pipe surrounding temperature [Pa]
         """
-
+        self.pipeline_index = pipeline_index
         self.inlet = inlet
         self.outlet = outlet
         self.inlet_index = inlet.index
@@ -200,6 +201,7 @@ class Pipeline:
             "hagen-poiseuille",
         ]
 
+        # print(self.pipeline_index)
         method = self.friction_factor_method
 
         if method == "constant":
@@ -240,6 +242,8 @@ class Pipeline:
         else:
             # return 0.05
             # return chen(epsilon=self.roughness, d=self.diameter, N_re=self.calculate_reynolds_number())
+            # print(self.diameter, self.gas_mixture.density, self.gas_mixture.viscosity)
+            # print(self.calculate_reynolds_number())
             return hagen_poiseuille(N_re=self.calculate_reynolds_number())
 
     def calculate_fictitious_resistance(self):
@@ -315,7 +319,7 @@ class Pipeline:
         elif p1**2 - p2**2 - slope_correction < 0:
             return -1
         else:
-            print(f"Pipeline {self.inlet_index} has same pressure on both ends!")
+            print(f"Pipeline {self.inlet_index} has same pressure on both ends: {(p1, p2)}!")
             # raise ValueError('Got condition case 0.')
             return 0
 

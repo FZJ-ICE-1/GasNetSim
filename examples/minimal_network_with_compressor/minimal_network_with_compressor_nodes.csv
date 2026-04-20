@@ -1,0 +1,5 @@
+node_index;longitude;latitude;altitude_m;temperature_k;node_type;flow_sm3_per_s;pressure_pa;flow_MW;flow_type;gas_composition
+1;0;0;0;300;reference;0;5000000;;volumetric;NATURAL_GAS_gri30
+2;1;0;0;288.15;demand;30;4500000;;volumetric;NATURAL_GAS_gri30
+3;2;0;0;288.15;demand;30;4950000;;volumetric;NATURAL_GAS_gri30
+4;3;0;0;288.15;demand;14.28571;4000000;;volumetric;NATURAL_GAS_gri30

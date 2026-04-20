@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.1.1
+## v0.2.2
+
+### Fixed
+
+- Fixed node and pipeline indexing
+- Added an if-condition for `no_mixing` in `gas_composition_tracking()`
+
+## v0.2.1
+
+### Changed
+
+- Use caches for gas mixture properties calculation to accelerate imports
+- Update tutorials/02_gas_mixture_properties.ipynb to show the import speed improvement
+
+## v0.2.0 - 2025-12-27
 
 ### Added
 
@@ -15,14 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Different reference temperature values for gas mixture heating value calculation (15 or 25 degrees Celsius)
 - Reference pressure, temperature and composition for gas mixture initialization
 - pre-commit hooks for automatically updating requirements.txt
+- Compressor model and corresponding examples and tests
 
 ### Changed
 
-- Changed the packaging tool from `setuptools` to `poetry`
-- Renamed create_network_from_csv() to create_network_from_folder() for clarity and add FutureWarning
+- Changed the packaging tool from `setuptools` / `poetry` to `uv`
 - Changed reference temperature for GasMixture class (wrt. density and combustion properties)
 - Changed run_time_series() to use profiles instead of profile file path
 - Improved results saving of time series simulations (support different output file formats)
+- Simulation solver uses individual indexing system for nodes and pipelines
+
+### Deprecated
+
+- Renamed create_network_from_csv() to create_network_from_folder() for clarity and add FutureWarning
 
 ## v0.1.0
 

@@ -105,7 +105,7 @@ class ViscosityCalculator:
         raise NotImplementedError("Subclasses must implement calculate_viscosity")
 
 
-@njit(float64[:](float64[:]))
+@njit(float64[:](float64[:]), cache=True, nogil=True)
 def calculate_mixture_critical_point(composition):
     """Calculate mixture critical point properties using linear mixing rules
 
