@@ -193,6 +193,15 @@ class PressureProblem(Problem):
         network.update_node_parameters(
             pressure=p_full, flow=self._f_target, temperature=self._t
         )
+        # Refresh flow rates at the current pressures *before* re-assigning
+        # gas-mixture nodes (inlet vs outlet).  For pipelines whose pressure
+        # drive nearly equals the slope correction (p1²−p2²−sc ≈ 0), the
+        # inlet/outlet choice depends on the sign of that tiny residual.
+        # Using stale flow rates from the previous iteration can flip the sign,
+        # leading to a self-sustaining oscillation.  This one-line refresh
+        # mirrors the legacy loop, which called update_connection_flow_rate()
+        # at the updated pressures before calling update_pipeline_parameters().
+        network.update_connection_flow_rate()
         if network.pipelines is not None:
             network.update_pipeline_parameters()
         if network.resistances is not None:
@@ -214,14 +223,29 @@ class PressureProblem(Problem):
         if self.run_composition_tracking:
             self._composition_tracker.update()
 
-        # 4. Compute nodal flow balance residual
+        # 4. Compute nodal flow balance residual using the target flow from the
+        #    start of the iteration. The legacy solver only refreshed
+        #    volumetric targets after forming the residual so the next Newton
+        #    step sees the updated demand/supply state.
         if self.use_cuda:
             import cupy as cp
             nodal_flow = cp.sum(f_mat, axis=1)
         else:
             nodal_flow = np.sum(f_mat, axis=1)
 
-        # Update f_target with latest flow-type conversions
+        delta_flow = self._f_target - nodal_flow
+        residual = list_to_array(
+            [
+                delta_flow[i]
+                for i in range(len(delta_flow))
+                if network.simulation_node_index_to_node_id(i)
+                not in self._non_junction_ids
+            ],
+            use_cuda=self.use_cuda,
+        )
+
+        # Refresh f_target after forming the residual so the next iteration
+        # uses gas-property-dependent conversions from the current state.
         for node in network.nodes.values():
             if node.flow_type == "volumetric":
                 node.convert_volumetric_to_energy_flow()
@@ -232,16 +256,6 @@ class PressureProblem(Problem):
             [
                 node.volumetric_flow if node.volumetric_flow is not None else 0.0
                 for node in network.nodes.values()
-            ],
-            use_cuda=self.use_cuda,
-        )
-
-        delta_flow = self._f_target - nodal_flow
-        residual = list_to_array(
-            [
-                delta_flow[i]
-                for i in range(len(delta_flow))
-                if network.simulation_node_index_to_node_id(i) not in self._non_junction_ids
             ],
             use_cuda=self.use_cuda,
         )

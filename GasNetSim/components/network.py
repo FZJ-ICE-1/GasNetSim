@@ -11,7 +11,6 @@ import numpy as np
 from typing import Tuple
 from scipy import sparse
 import logging
-import copy
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import optimize
@@ -896,188 +895,6 @@ class Network:
 
         return x
 
-    def _simulation_legacy(
-        self,
-        max_iter=100,
-        tol=0.001,
-        underrelaxation_factor=2.0,
-        use_cuda=False,
-        sparse_matrix=False,
-        tracking_method="simple_mixing",
-        time_step=3600,
-        problem=None,
-        solver=None,
-    ):
-        from GasNetSim.simulation.formulations import PressureProblem
-        from GasNetSim.simulation.solvers import NewtonRaphsonSolver
-
-        if problem is None:
-            problem = PressureProblem(
-                self,
-                use_cuda=use_cuda,
-                sparse_matrix=sparse_matrix,
-                tracking_method=tracking_method,
-                time_step=time_step,
-            )
-        if solver is None:
-            solver = NewtonRaphsonSolver(underrelaxation_factor=underrelaxation_factor)
-
-        x0 = problem.initial_state()
-        result = solver.solve(
-            residual_fn=problem.residual,
-            jacobian_fn=problem.jacobian,
-            x0=x0,
-            tol=tol,
-            max_iter=max_iter,
-        )
-
-        if not result.converged:
-            raise RuntimeError(
-                f"Simulation not converged in {result.n_iter} iteration(s)!"
-            )
-
-        logger.info(f"Simulation converges in {result.n_iter} iteration(s).")
-        problem.unpack(result.x)
-
-        for i_connection, connection in self.connections.items():
-            logger.debug(f"Pipeline index: {i_connection}")
-            logger.debug(f"Pipeline flow rate: {connection.flow_rate}")
-            logger.debug(
-                f"Gas mixture composition: {connection.gas_mixture.composition}"
-            )
-
-        return self
-
-    def _simulation_staggered(
-        self,
-        max_iter=100,
-        tol=0.001,
-        underrelaxation_factor=2.0,
-        use_cuda=False,
-        sparse_matrix=False,
-        tracking_method="simple_mixing",
-        time_step=3600,
-        solver=None,
-        coupling_max_iter=20,
-        coupling_tol=1e-4,
-        outer_pressure_tol=None,
-        composition_relaxation_factor=0.5,
-    ):
-        from GasNetSim.simulation.formulations import PressureProblem
-        from GasNetSim.simulation.solvers import NewtonRaphsonSolver
-
-        if tracking_method == "no_mixing":
-            return self._simulation_legacy(
-                max_iter=max_iter,
-                tol=tol,
-                underrelaxation_factor=underrelaxation_factor,
-                use_cuda=use_cuda,
-                sparse_matrix=sparse_matrix,
-                tracking_method=tracking_method,
-                time_step=time_step,
-                solver=solver,
-            )
-
-        if coupling_max_iter < 1:
-            raise ValueError("coupling_max_iter must be at least 1.")
-        if outer_pressure_tol is None:
-            outer_pressure_tol = max(10.0, tol * 1e5)
-        if solver is None:
-            solver = NewtonRaphsonSolver(
-                underrelaxation_factor=underrelaxation_factor
-            )
-
-        original_run_initialization = self.run_initialization
-        original_pressure_prev = copy.deepcopy(self.pressure_prev)
-        original_run_composition_initialization = (
-            self.run_composition_initialization
-        )
-
-        previous_pressure = None
-
-        try:
-            for outer_iter in range(1, coupling_max_iter + 1):
-                if outer_iter > 1:
-                    self.run_initialization = False
-                    self.pressure_prev = self.save_pressure_values()
-
-                inner_problem = PressureProblem(
-                    self,
-                    use_cuda=use_cuda,
-                    sparse_matrix=sparse_matrix,
-                    tracking_method="no_mixing",
-                    time_step=time_step,
-                    run_composition_tracking=False,
-                )
-
-                self.run_composition_initialization = False
-                self._simulation_legacy(
-                    max_iter=max_iter,
-                    tol=tol,
-                    underrelaxation_factor=underrelaxation_factor,
-                    use_cuda=use_cuda,
-                    sparse_matrix=sparse_matrix,
-                    tracking_method="no_mixing",
-                    time_step=time_step,
-                    problem=inner_problem,
-                    solver=solver,
-                )
-
-                current_pressure = np.array(self.save_pressure_values(), copy=True)
-                previous_composition = self._snapshot_nodal_eos_compositions()
-
-                self.run_composition_initialization = True
-                self.composition_initialization(
-                    tracking_method=tracking_method,
-                    time_step=time_step,
-                )
-                target_composition = self._snapshot_nodal_eos_compositions()
-                composition_delta = self._apply_relaxed_nodal_compositions(
-                    previous_composition,
-                    target_composition,
-                    composition_relaxation_factor,
-                )
-
-                if previous_pressure is None:
-                    pressure_delta = np.inf
-                else:
-                    pressure_delta = float(
-                        np.max(np.abs(current_pressure - previous_pressure))
-                    )
-
-                logger.info(
-                    "Staggered coupling iteration %d/%d: pressure delta %.3f Pa, composition delta %.3e",
-                    outer_iter,
-                    coupling_max_iter,
-                    pressure_delta,
-                    composition_delta,
-                )
-
-                if (
-                    previous_pressure is not None
-                    and pressure_delta <= outer_pressure_tol
-                    and composition_delta <= coupling_tol
-                ):
-                    logger.info(
-                        "Staggered coupling converges in %d iteration(s).",
-                        outer_iter,
-                    )
-                    return self
-
-                previous_pressure = current_pressure
-
-        finally:
-            self.run_initialization = original_run_initialization
-            self.pressure_prev = original_pressure_prev
-            self.run_composition_initialization = (
-                original_run_composition_initialization
-            )
-
-        raise RuntimeError(
-            "Staggered coupling not converged in "
-            f"{coupling_max_iter} iteration(s)!"
-        )
-
     def simulation(
         self,
         max_iter=100,
@@ -1089,46 +906,44 @@ class Network:
         time_step=3600,
         problem=None,
         solver=None,
-        coupling_strategy="legacy",
+        coupling_strategy="direct",
         coupling_max_iter=20,
         coupling_tol=1e-4,
         outer_pressure_tol=None,
         composition_relaxation_factor=0.5,
     ):
-        if coupling_strategy == "legacy":
-            return self._simulation_legacy(
-                max_iter=max_iter,
-                tol=tol,
-                underrelaxation_factor=underrelaxation_factor,
-                use_cuda=use_cuda,
-                sparse_matrix=sparse_matrix,
-                tracking_method=tracking_method,
-                time_step=time_step,
-                problem=problem,
-                solver=solver,
+        from GasNetSim.simulation.strategies import DirectStrategy, StaggeredStrategy
+
+        common = dict(
+            max_iter=max_iter,
+            tol=tol,
+            underrelaxation_factor=underrelaxation_factor,
+            use_cuda=use_cuda,
+            sparse_matrix=sparse_matrix,
+            tracking_method=tracking_method,
+            time_step=time_step,
+        )
+
+        if coupling_strategy == "direct":
+            return DirectStrategy(problem=problem, solver=solver).solve(
+                self, **common
             )
+
         if coupling_strategy in ("staggered", "outer_picard"):
             if problem is not None:
                 raise ValueError(
                     "Custom problem instances are only supported with "
-                    "coupling_strategy='legacy'."
+                    "coupling_strategy='direct'."
                 )
-            return self._simulation_staggered(
-                max_iter=max_iter,
-                tol=tol,
-                underrelaxation_factor=underrelaxation_factor,
-                use_cuda=use_cuda,
-                sparse_matrix=sparse_matrix,
-                tracking_method=tracking_method,
-                time_step=time_step,
+            return StaggeredStrategy(
                 solver=solver,
                 coupling_max_iter=coupling_max_iter,
                 coupling_tol=coupling_tol,
                 outer_pressure_tol=outer_pressure_tol,
                 composition_relaxation_factor=composition_relaxation_factor,
-            )
+            ).solve(self, **common)
 
         raise ValueError(
-            "Unknown coupling_strategy: "
-            f"{coupling_strategy!r}. Available: ['legacy', 'staggered']"
+            f"Unknown coupling_strategy: {coupling_strategy!r}. "
+            "Available: ['direct', 'staggered']"
         )

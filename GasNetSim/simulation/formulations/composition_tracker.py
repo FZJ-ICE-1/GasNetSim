@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 _N_SPECIES = 21  # number of EOS composition entries
 
 
+def _allclose_with_nan(a, b, rtol=1e-3, atol=1e-4):
+    nan_equal = np.isnan(a) & np.isnan(b)
+    close_equal = np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=False)
+    return bool(np.all(nan_equal | close_equal))
+
+
 class CompositionTracker:
     """
     Tracks gas composition through the network during Newton-Raphson iterations.
@@ -98,11 +104,17 @@ class CompositionTracker:
         else:
             raise ValueError(f"Unknown tracking method: {self.tracking_method!r}")
 
-        # Write result into node tmp compositions
+        # Write result into node tmp compositions.
+        # Skip non-junction nodes (reference / shortpipe-inlet) — their
+        # composition is defined by the supply source and must not be
+        # overwritten by any transient inflow during Newton iterations.
+        non_junction = network.non_junction_nodes
         for sim_idx in range(nodal_composition.shape[1]):
             col = nodal_composition[:, sim_idx]
             if not np.any(np.isnan(col)):
                 node_id = network.simulation_node_index_to_node_id(sim_idx)
+                if node_id in non_junction:
+                    continue
                 network.nodes[node_id].gas_mixture.eos_composition_tmp = col
 
         return nodal_composition
@@ -174,6 +186,7 @@ class CompositionTracker:
         """
         network = self.network
         n_nodes = network.get_simulation_node_count()
+        non_junction = network.non_junction_nodes
 
         composition_sum = np.zeros((_N_SPECIES, n_nodes))
         flow_sum = np.zeros(n_nodes)
@@ -201,10 +214,12 @@ class CompositionTracker:
             flow_sum[ds_idx] += abs_flow
 
             # Immediately finalise downstream node so edges further downstream
-            # see the correct composition.
-            network.nodes[downstream_id].gas_mixture.eos_composition_tmp = (
-                composition_sum[:, ds_idx] / flow_sum[ds_idx]
-            )
+            # see the correct composition — but never overwrite a reference /
+            # shortpipe-inlet node, whose composition is fixed by the supply.
+            if downstream_id not in non_junction:
+                network.nodes[downstream_id].gas_mixture.eos_composition_tmp = (
+                    composition_sum[:, ds_idx] / flow_sum[ds_idx]
+                )
 
         with np.errstate(divide="ignore", invalid="ignore"):
             nodal_composition = np.where(
@@ -216,43 +231,86 @@ class CompositionTracker:
 
     def _propagate_no_mixing(self, edge_order: list) -> np.ndarray:
         """
-        No mixing: outflow composition is unchanged (keeps whatever is already
-        in each node's gas_mixture.eos_composition_tmp after the reset).
-        Still builds the nodal matrix for consistency.
+        No mixing: for Pipelines, the edge's outflow is the downstream node's
+        current composition (pipe does not mix contents). For non-Pipeline
+        connections (ShortPipe / Compressor / Resistance) the edge always
+        carries the upstream composition — matching the inline semantics
+        where ShortPipe/Compressor cache outflow_composition = inlet composition
+        at construction.
+
+        At a junction receiving any non-Pipeline inflow carrying a different
+        composition, the node's fixed-point composition is the flow-weighted
+        average of those external contributions. Single-pass does not reach
+        that fixed point because Pipeline edges self-reference the node's own
+        composition, so we iterate until the nodal composition matrix stops
+        changing — mirroring the `while to_update` loop in the original
+        `calculate_nodal_inflow_states`.
         """
         network = self.network
         n_nodes = network.get_simulation_node_count()
-        composition_sum = np.zeros((_N_SPECIES, n_nodes))
-        flow_sum = np.zeros(n_nodes)
+        non_junction = network.non_junction_nodes
 
-        for conn_id in edge_order:
-            connection = network.connections[conn_id]
-            flow_rate = connection.flow_rate
-            if not flow_rate:
-                continue
+        prev_nodal = np.zeros((_N_SPECIES, n_nodes))
+        max_inner_iter = 100
+        nodal_composition = prev_nodal
 
-            if self._flow_sign(connection) >= 0:
-                upstream_id = connection.inlet_index
-                downstream_id = connection.outlet_index
-            else:
-                upstream_id = connection.outlet_index
-                downstream_id = connection.inlet_index
+        for _ in range(max_inner_iter):
+            composition_sum = np.zeros((_N_SPECIES, n_nodes))
+            flow_sum = np.zeros(n_nodes)
 
-            # no_mixing: outflow keeps existing downstream composition
-            outflow_comp = (
-                network.nodes[downstream_id].gas_mixture.eos_composition_tmp
-            )
-            abs_flow = abs(flow_rate)
-            ds_idx = network.node_id_to_simulation_node_index(downstream_id)
-            composition_sum[:, ds_idx] += outflow_comp * abs_flow
-            flow_sum[ds_idx] += abs_flow
+            for conn_id in edge_order:
+                connection = network.connections[conn_id]
+                flow_rate = connection.flow_rate
+                if not flow_rate:
+                    continue
 
-        with np.errstate(divide="ignore", invalid="ignore"):
-            nodal_composition = np.where(
-                flow_sum > 0,
-                composition_sum / flow_sum,
-                np.nan,
-            )
+                if self._flow_sign(connection) >= 0:
+                    upstream_id = connection.inlet_index
+                    downstream_id = connection.outlet_index
+                else:
+                    upstream_id = connection.outlet_index
+                    downstream_id = connection.inlet_index
+
+                if isinstance(connection, Pipeline):
+                    # Pipeline under no_mixing: outflow is the downstream
+                    # node's current composition (pipe leaves contents alone).
+                    outflow_comp = (
+                        network.nodes[downstream_id].gas_mixture.eos_composition_tmp
+                    )
+                else:
+                    # ShortPipe / Compressor / Resistance: outflow carries the
+                    # upstream composition, regardless of tracking method.
+                    outflow_comp = (
+                        network.nodes[upstream_id].gas_mixture.eos_composition_tmp
+                    )
+
+                abs_flow = abs(flow_rate)
+                ds_idx = network.node_id_to_simulation_node_index(downstream_id)
+                composition_sum[:, ds_idx] += outflow_comp * abs_flow
+                flow_sum[ds_idx] += abs_flow
+
+            with np.errstate(divide="ignore", invalid="ignore"):
+                nodal_composition = np.where(
+                    flow_sum > 0,
+                    composition_sum / flow_sum,
+                    np.nan,
+                )
+
+            # Write back to junction nodes so the next inner iteration sees
+            # the updated composition via eos_composition_tmp.
+            for sim_idx in range(n_nodes):
+                col = nodal_composition[:, sim_idx]
+                if np.any(np.isnan(col)):
+                    continue
+                node_id = network.simulation_node_index_to_node_id(sim_idx)
+                if node_id in non_junction:
+                    continue
+                network.nodes[node_id].gas_mixture.eos_composition_tmp = col
+
+            if _allclose_with_nan(nodal_composition, prev_nodal):
+                break
+            prev_nodal = nodal_composition
+
         return nodal_composition
 
     def _propagate_batch_tracking(self, edge_order: list) -> np.ndarray:
@@ -262,12 +320,35 @@ class CompositionTracker:
         """
         network = self.network
         n_nodes = network.get_simulation_node_count()
+        non_junction = network.non_junction_nodes
         composition_sum = np.zeros((_N_SPECIES, n_nodes))
         flow_sum = np.zeros(n_nodes)
 
         for conn_id in edge_order:
             connection = network.connections[conn_id]
+            # ShortPipe / Compressor / Resistance are pass-through: they
+            # contribute the upstream composition to the downstream node.
             if not isinstance(connection, Pipeline):
+                flow_rate = connection.flow_rate
+                if not flow_rate:
+                    continue
+                if self._flow_sign(connection) >= 0:
+                    upstream_id = connection.inlet_index
+                    downstream_id = connection.outlet_index
+                else:
+                    upstream_id = connection.outlet_index
+                    downstream_id = connection.inlet_index
+                outflow_comp = (
+                    network.nodes[upstream_id].gas_mixture.eos_composition_tmp
+                )
+                abs_flow = abs(flow_rate)
+                ds_idx = network.node_id_to_simulation_node_index(downstream_id)
+                composition_sum[:, ds_idx] += outflow_comp * abs_flow
+                flow_sum[ds_idx] += abs_flow
+                if flow_sum[ds_idx] > 0 and downstream_id not in non_junction:
+                    network.nodes[downstream_id].gas_mixture.eos_composition_tmp = (
+                        composition_sum[:, ds_idx] / flow_sum[ds_idx]
+                    )
                 continue
 
             flow_rate = connection.flow_rate
@@ -308,8 +389,10 @@ class CompositionTracker:
             composition_sum[:, ds_idx] += outflow_comp * abs_flow
             flow_sum[ds_idx] += abs_flow
 
-            # Immediately update so downstream edges see the fresh composition.
-            if flow_sum[ds_idx] > 0:
+            # Immediately update so downstream edges see the fresh composition
+            # — but never overwrite a reference / shortpipe-inlet node, whose
+            # composition is fixed by the supply.
+            if flow_sum[ds_idx] > 0 and downstream_id not in non_junction:
                 network.nodes[downstream_id].gas_mixture.eos_composition_tmp = (
                     composition_sum[:, ds_idx] / flow_sum[ds_idx]
                 )
