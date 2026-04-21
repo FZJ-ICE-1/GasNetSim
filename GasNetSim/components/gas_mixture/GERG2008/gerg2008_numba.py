@@ -425,32 +425,24 @@ def tTermsGERG_numba_sub(lntau, x):
     taupijk = np.zeros((MaxFlds, MaxTrmM))
 
     i = 4  # Use propane to get exponents for short form of EOS
-    for k in range(
-        int(kpol[i] + kexp[i])
-    ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+    for k in range(kpol[i] + kexp[i]):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
         taup0[k] = math.exp(toik[i][k] * lntau)
     for i in range(NcGERG):  # for (int i = 1; i <= NcGERG; ++i)
         if x[i] > epsilon:
             if (i > 3) and (i != 14) and (i != 17) and (i != 19):
-                for k in range(
-                    int(kpol[i] + kexp[i])
-                ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+                for k in range(kpol[i] + kexp[i]):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
                     taup[i][k] = noik[i][k] * taup0[k]
             else:
-                for k in range(
-                    int(kpol[i] + kexp[i])
-                ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+                for k in range(kpol[i] + kexp[i]):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
                     taup[i][k] = noik[i][k] * math.exp(toik[i][k] * lntau)
 
     for i in range(NcGERG):  # for (int i = 1; i <= NcGERG - 1; ++i)
         if x[i] > epsilon:
             for j in range(i + 1, NcGERG):  # for (int j = i + 1; j <= NcGERG; ++j)
                 if x[j] > epsilon:
-                    mn = int(mNumb[i][j] - 1)
+                    mn = mNumb[i][j] - 1
                     if mn >= 0:
-                        for k in range(
-                            int(kpolij[mn])
-                        ):  # for (int k = 1; k <= kpolij[mn]; ++k)
+                        for k in range(kpolij[mn]):  # for (int k = 1; k <= kpolij[mn]; ++k)
                             taupijk[mn][k] = nijk[mn][k] * math.exp(tijk[mn][k] * lntau)
 
     return taup, taupijk
@@ -511,8 +503,8 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
     # Calculate pure fluid contributions
     for i in range(NcGERG):
         if x[i] > epsilon:
-            for k in range(int(kpol[i])):
-                ndt = x[i] * delp[int(doik[i][k] - 1)] * taup[i][k]
+            for k in range(kpol[i]):
+                ndt = x[i] * delp[doik[i][k] - 1] * taup[i][k]
                 ndtd = ndt * doik[i][k]
                 ar[0][1] += ndtd
                 ar[0][2] += ndtd * (doik[i][k] - 1)
@@ -525,14 +517,14 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
                     ar[1][2] += ndtt * doik[i][k] * (doik[i][k] - 1)
                     ar[0][3] += ndtd * (doik[i][k] - 1) * (doik[i][k] - 2)
 
-            for k in range(int(kpol[i]), int(kpol[i] + kexp[i])):
+            for k in range(kpol[i], kpol[i] + kexp[i]):
                 ndt = (
                     x[i]
-                    * delp[int(doik[i][k] - 1)]
+                    * delp[doik[i][k] - 1]
                     * taup[i][k]
-                    * Expd[int(coik[i][k] - 1)]
+                    * Expd[coik[i][k] - 1]
                 )
-                ex = coik[i][k] * delp[int(coik[i][k] - 1)]
+                ex = coik[i][k] * delp[coik[i][k] - 1]
                 ex2 = doik[i][k] - ex
                 ex3 = ex2 * (ex2 - 1)
                 ar[0][1] += ndt * ex2
@@ -553,13 +545,11 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
         if x[i] > epsilon:
             for j in range(i + 1, NcGERG):  # for (int j = i + 1; j <= NcGERG; ++j)
                 if x[j] > epsilon:
-                    mn = int(mNumb[i][j] - 1)
+                    mn = mNumb[i][j] - 1
                     if mn >= 0:
                         xijf = x[i] * x[j] * fij[i][j]
-                        for k in range(
-                            int(kpolij[mn])
-                        ):  # for (int k = 1; k <= kpolij[mn]; ++k)
-                            ndt = xijf * delp[int(dijk[mn][k] - 1)] * taupijk[mn][k]
+                        for k in range(kpolij[mn]):  # for (int k = 1; k <= kpolij[mn]; ++k)
+                            ndt = xijf * delp[dijk[mn][k] - 1] * taupijk[mn][k]
                             ndtd = ndt * dijk[mn][k]
                             ar[0][1] += ndtd
                             ar[0][2] += ndtd * (dijk[mn][k] - 1)
@@ -573,14 +563,14 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
                                 ar[0][3] += ndtd * (dijk[mn][k] - 1) * (dijk[mn][k] - 2)
 
                         for k in range(
-                            int(kpolij[mn]), int(kpolij[mn] + kexpij[mn])
+                            kpolij[mn], kpolij[mn] + kexpij[mn]
                         ):  # for (int k = 1 + kpolij[mn]; k <= kpolij[mn] + kexpij[mn]; ++k)
                             cij0 = cijk[mn][k] * delp[1]
                             eij0 = eijk[mn][k] * delta
                             ndt = (
                                 xijf
                                 * nijk[mn][k]
-                                * delp[int(dijk[mn][k] - 1)]
+                                * delp[dijk[mn][k] - 1]
                                 * math.exp(
                                     cij0 + eij0 + gijk[mn][k] + tijk[mn][k] * lntau
                                 )

@@ -21,19 +21,19 @@ MaxMdl = 10
 MaxTrmM = 12
 MaxTrmP = 24
 epsilon = 1e-15
-coik = np.zeros((MaxFlds, MaxTrmP))
-doik = np.zeros((MaxFlds, MaxTrmP))
-dijk = np.zeros((MaxMdl, MaxTrmM))
+coik = np.zeros((MaxFlds, MaxTrmP), dtype=np.int32)
+doik = np.zeros((MaxFlds, MaxTrmP), dtype=np.int32)
+dijk = np.zeros((MaxMdl, MaxTrmM), dtype=np.int32)
 Drold = 0
 Trold = 0
 Told = 0
 Trold2 = 0
 xold = np.zeros(MaxFlds)
-mNumb = np.zeros((MaxFlds, MaxFlds))
-kpol = np.zeros(MaxFlds)
-kexp = np.zeros(MaxFlds)
-kpolij = np.zeros(MaxMdl)
-kexpij = np.zeros(MaxMdl)
+mNumb = np.zeros((MaxFlds, MaxFlds), dtype=np.int32)
+kpol = np.zeros(MaxFlds, dtype=np.int32)
+kexp = np.zeros(MaxFlds, dtype=np.int32)
+kpolij = np.zeros(MaxMdl, dtype=np.int32)
+kexpij = np.zeros(MaxMdl, dtype=np.int32)
 Dc = np.zeros(MaxFlds)
 Tc = np.zeros(MaxFlds)
 MMiGERG = np.zeros(MaxFlds)
@@ -60,6 +60,33 @@ n0i = np.zeros((MaxFlds, 7))
 # dPdDsave = 0
 
 air_molar_mass = 28.97  # g/mol
+
+number_of_atoms = np.array(
+    [
+        [0, 1, 4, 0, 0, 0, 0],
+        [0, 0, 0, 0, 2, 0, 0],
+        [0, 1, 0, 0, 0, 2, 0],
+        [0, 2, 6, 0, 0, 0, 0],
+        [0, 3, 8, 0, 0, 0, 0],
+        [0, 4, 10, 0, 0, 0, 0],
+        [0, 4, 10, 0, 0, 0, 0],
+        [0, 5, 12, 0, 0, 0, 0],
+        [0, 5, 12, 0, 0, 0, 0],
+        [0, 6, 14, 0, 0, 0, 0],
+        [0, 7, 16, 0, 0, 0, 0],
+        [0, 8, 18, 0, 0, 0, 0],
+        [0, 9, 20, 0, 0, 0, 0],
+        [0, 10, 22, 0, 0, 0, 0],
+        [0, 0, 2, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 2, 0],
+        [0, 1, 0, 0, 0, 1, 0],
+        [0, 0, 2, 0, 0, 1, 0],
+        [0, 0, 2, 0, 0, 0, 1],
+        [0, 0, 0, 1, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
+    ],
+    dtype=np.float64,
+)
 
 
 # def SetupGERG():
