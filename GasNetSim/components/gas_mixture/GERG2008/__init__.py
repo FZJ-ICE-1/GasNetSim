@@ -6,7 +6,5 @@
 #     Last change on 3/25/24, 5:36 PM
 #     Last change by yifei
 #    *****************************************************************************
-from .setup import *
-from .gerg2008 import *
 from .gerg2008_numba import *
 from .gerg2008_constants import *

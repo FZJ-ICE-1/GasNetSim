@@ -13,6 +13,7 @@ from numba import prange
 from scipy.constants import bar
 
 from GasNetSim.components.gas_mixture.GERG2008 import *
+from tests.reference.gerg2008 import GasMixtureGERG2008Reference
 
 
 def speed_heating_value(repeats=10000):
@@ -75,8 +76,8 @@ def speed_heating_value(repeats=10000):
     gerg2008_composition = convert_to_gerg2008_composition(nist_gas_mixture)
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(
-        500 * bar, 400, gerg2008_composition, use_numba=False
+    gas_mixture = GasMixtureGERG2008Reference(
+        500 * bar, 400, gerg2008_composition
     )
 
     # Measure the execution time
@@ -168,7 +169,7 @@ def speed_convert_composition_gerg():
         nist_gas_mixture[a[ii]] = b[ii]
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture)
+    gas_mixture = GasMixtureGERG2008Reference(500 * bar, 400, nist_gas_mixture)
 
     # Test the ConvertCompositionGERG function
     # Measure the execution time
@@ -252,7 +253,7 @@ def speed_molarmass_gerg():
         nist_gas_mixture[a[ii]] = b[ii]
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture)
+    gas_mixture = GasMixtureGERG2008Reference(500 * bar, 400, nist_gas_mixture)
 
     # Calculate the expected molar mass manually based on the given mixture
     # Measure the execution time
@@ -331,7 +332,7 @@ def speed_pressure_gerg():
         nist_gas_mixture[a[ii]] = b[ii]
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture)
+    gas_mixture = GasMixtureGERG2008Reference(500 * bar, 400, nist_gas_mixture)
 
     # Define the density input for PressureGERG method
     d = 10
@@ -414,7 +415,7 @@ def speed_density_gerg():
         nist_gas_mixture[a[ii]] = b[ii]
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture)
+    gas_mixture = GasMixtureGERG2008Reference(500 * bar, 400, nist_gas_mixture)
 
     # Define the density input for PressureGERG method
     d = gas_mixture.MolarDensity
@@ -502,7 +503,7 @@ def speed_alpha0_gerg():
         nist_gas_mixture[a[ii]] = b[ii]
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture)
+    gas_mixture = GasMixtureGERG2008Reference(500 * bar, 400, nist_gas_mixture)
 
     # Expected value calculated from the function call
     # a0(0) - Ideal gas Helmholtz energy (all dimensionless [i.e., divided by RT])
@@ -588,7 +589,7 @@ def speed_reducing_parameters_gerg():
         nist_gas_mixture[a[ii]] = b[ii]
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture)
+    gas_mixture = GasMixtureGERG2008Reference(500 * bar, 400, nist_gas_mixture)
 
     # Expected value calculated from the function call
     # Measure the execution time
@@ -673,7 +674,7 @@ def speed_pseudo_critical_point_gerg():
         nist_gas_mixture[a[ii]] = b[ii]
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(500 * bar, 400, nist_gas_mixture)
+    gas_mixture = GasMixtureGERG2008Reference(500 * bar, 400, nist_gas_mixture)
 
     # Expected value calculated from the function call
     # Measure the execution time
@@ -765,8 +766,8 @@ def speed_alphar_gerg(repeats=10000):
     )
 
     # Create an instance of the GasMixtureGERG2008 class with the NIST gas mixture
-    gas_mixture = GasMixtureGERG2008(
-        500 * bar, 400, nist_gas_mixture_gerg2008_composition, use_numba=False
+    gas_mixture = GasMixtureGERG2008Reference(
+        500 * bar, 400, nist_gas_mixture_gerg2008_composition
     )
 
     # Expected value calculated from the function call

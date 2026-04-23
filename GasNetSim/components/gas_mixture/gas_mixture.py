@@ -12,9 +12,8 @@ from scipy.constants import atm, zero_Celsius
 
 # from .thermo.thermo import Mixture
 # from thermo import Mixture
-from .GERG2008.gerg2008 import *
+from .GERG2008.gerg2008_numba import *
 from .GERG2008.gerg2008_constants import *
-from .GERG2008.gerg2008 import convert_to_gerg2008_composition
 from .viscosity import calculate_viscosity
 from .viscosity import ViscosityMethod
 

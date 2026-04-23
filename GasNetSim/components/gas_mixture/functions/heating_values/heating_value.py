@@ -3,7 +3,7 @@ import json
 import numpy as np
 from numba import njit, float64, types, int32, boolean
 
-from ...GERG2008.gerg2008 import number_of_atoms
+from ...GERG2008.gerg2008_constants import number_of_atoms
 
 REF_TEMP_COMBUSTION = [0.0, 15.0, 25.0]  # Implemented reference temperatures
 
