@@ -108,7 +108,9 @@ from copy import deepcopy
 from scipy.constants import atm
 
 from .setup import *
-from GasNetSim.components.gas_mixture.GERG2008.gerg2008_constants import gerg_gas_spices
+from GasNetSim.components.gas_mixture.eos.gerg2008_constants import (
+    gerg_gas_spices,
+)
 
 
 def Tanh(xx):
@@ -290,7 +292,7 @@ class GasMixtureGERG2008Reference:
         self.LHV_J_per_kg = self.CalculateHeatingValue(comp=composition, hhv=False, parameter="mass")
 
     def CalculateHeatingValue(self, comp, hhv, parameter, ref_temp=25.0):
-        from GasNetSim.components.gas_mixture.functions.heating_values.heating_value import load_enthalpy_values
+        from GasNetSim.components.gas_mixture.thermochemistry import load_enthalpy_values
         atom_list = number_of_atoms * comp[:, np.newaxis]
         reactants_atom = np.sum(atom_list, axis=0)
 

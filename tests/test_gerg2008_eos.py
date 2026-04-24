@@ -9,7 +9,7 @@
 from numpy.testing import assert_almost_equal
 from scipy.constants import bar
 
-from GasNetSim.components.gas_mixture.GERG2008 import *
+from GasNetSim.components.gas_mixture.eos import *
 from tests.reference.gerg2008 import GasMixtureGERG2008Reference
 
 
@@ -67,7 +67,7 @@ def test_gerg_function_with_original_cpp_implementation():
     gerg_gas_composition = convert_to_gerg2008_composition(nist_gas_mixture)
 
     for gas_mixture in (
-        GasMixtureGERG2008(500 * bar, 400, gerg_gas_composition),
+        calculate_gerg2008_properties(500 * bar, 400, gerg_gas_composition),
         GasMixtureGERG2008Reference(500 * bar, 400, gerg_gas_composition),
     ):
 

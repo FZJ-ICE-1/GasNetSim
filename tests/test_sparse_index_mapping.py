@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from GasNetSim.components.node import Node
 from GasNetSim.components.pipeline import Pipeline
 from GasNetSim.components.network import Network
-from GasNetSim.components.gas_mixture.gas_mixture import GasMixture
 from GasNetSim.components.gas_mixture.typical_mixture_composition import NATURAL_GAS_gri30
 
 

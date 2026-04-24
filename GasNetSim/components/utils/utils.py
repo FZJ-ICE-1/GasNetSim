@@ -14,6 +14,7 @@ import seaborn as sns
 from scipy import sparse
 
 from .cuda_support import create_matrix_of_zeros
+from ..gas_mixture.gas_mixture import calculate_gas_mixture
 from ..pipeline import Pipeline
 
 
@@ -236,8 +237,8 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
     if velocity is None:
         velocity = 0
 
-    inlet_composition = connection.inlet.gas_mixture.eos_composition_tmp
-    outlet_composition = connection.outlet.gas_mixture.eos_composition_tmp
+    inlet_composition = connection.inlet.gas_mixture.eos_composition
+    outlet_composition = connection.outlet.gas_mixture.eos_composition
 
     # if velocity >= 0:
     #     outflow_composition = outlet_composition
@@ -254,9 +255,9 @@ def gas_composition_tracking(connection, time_step, method="simple_mixing"):
         )
         # outflow_composition = outlet_composition if velocity >= 0 else inlet_composition
         # if velocity >= 0:
-        #     outflow_composition = connection.outlet.gas_mixture.eos_composition_tmp
+        #     outflow_composition = connection.outlet.gas_mixture.eos_composition
         # else:
-        #     outflow_composition = connection.inlet.gas_mixture.eos_composition_tmp
+        #     outflow_composition = connection.inlet.gas_mixture.eos_composition
     elif method == "simple_mixing":
         outflow_composition = inflow_composition
     elif method == "no_mixing":
@@ -472,7 +473,7 @@ def calculate_nodal_inflow_states(
 
         _nodal_composition_matrix = create_nodal_composition_matrix(network)
 
-        nodes = update_temporary_nodal_gas_mixture_properties(
+        nodes = update_nodal_gas_mixture_properties(
             network, _nodal_composition_matrix
         )
         if allclose_with_nan(_nodal_composition_matrix, _prev_nodal_composition_matrix):
@@ -485,9 +486,9 @@ def calculate_nodal_inflow_states(
     return _nodal_composition_matrix, pipelines, nodes
 
 
-def update_temporary_nodal_gas_mixture_properties(network, nodal_composition_matrix):
+def update_nodal_gas_mixture_properties(network, nodal_composition_matrix):
     """
-    Update temporary nodal gas mixture properties using network object.
+    Recalculate nodal gas mixture properties using network object.
     
     Args:
         network: Network object containing nodes and index mapping
@@ -499,8 +500,20 @@ def update_temporary_nodal_gas_mixture_properties(network, nodal_composition_mat
             pass
         else:
             node_id = network.simulation_node_index_to_node_id(_i)
-            nodes[node_id].gas_mixture.eos_composition_tmp = nodal_composition_matrix[:, _i]
+            gas_mixture = nodes[node_id].gas_mixture
+            nodes[node_id].gas_mixture = calculate_gas_mixture(
+                pressure=nodes[node_id].pressure,
+                temperature=nodes[node_id].temperature,
+                composition=nodal_composition_matrix[:, _i],
+                method=gas_mixture.method,
+                viscosity_method=gas_mixture.viscosity_method,
+            )
     return nodes
+
+
+def update_temporary_nodal_gas_mixture_properties(network, nodal_composition_matrix):
+    """Legacy wrapper for the pre-factory composition update API."""
+    return update_nodal_gas_mixture_properties(network, nodal_composition_matrix)
 
 
 def calculate_flow_matrix(network, pressure_bar):

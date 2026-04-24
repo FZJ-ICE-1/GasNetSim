@@ -175,7 +175,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from scipy.constants import bar
 
-    from GasNetSim.components.gas_mixture import GasMixture
+    from GasNetSim.components.gas_mixture import calculate_gas_mixture
     from collections import OrderedDict
 
     gas_comp = OrderedDict(
@@ -198,7 +198,7 @@ if __name__ == "__main__":
     Nre_res_simp = []
 
     for p in pressures:
-        gas_mixture = GasMixture(
+        gas_mixture = calculate_gas_mixture(
             temperature=288.15, pressure=p * bar, composition=gas_comp
         )
         gas_mix_viscosity = gas_mixture.viscosity

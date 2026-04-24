@@ -7,15 +7,18 @@
 #     Last change by yifei
 #    *****************************************************************************
 from .gas_mixture import *
-
-# from .heating_value import *
 from .typical_mixture_composition import *
-from .GERG2008 import GasMixtureGERG2008
-
+from .eos import (
+    GERG2008Properties,
+    GasMixtureGERG2008,
+    calculate_gerg2008_properties,
+)
+from .thermochemistry import (
+    CalculateHeatingValue_numba,
+    calculate_absolute_enthalpies,
+    load_enthalpy_values,
+)
 from .viscosity import (
-    calculate_viscosity,
     ViscosityMethod,
-    MixtureProperties,
-    ViscosityCalculator,
-    ViscosityCalculatorFactory
+    calculate_viscosity,
 )

@@ -12,7 +12,7 @@ from timeit import default_timer as timer
 from numba import prange
 from scipy.constants import bar
 
-from GasNetSim.components.gas_mixture.GERG2008 import *
+from GasNetSim.components.gas_mixture.eos import *
 from tests.reference.gerg2008 import GasMixtureGERG2008Reference
 
 

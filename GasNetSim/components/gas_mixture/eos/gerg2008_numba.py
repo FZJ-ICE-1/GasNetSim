@@ -9,6 +9,7 @@
 import math
 import json
 from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
 from numba import njit, float64, types, int32, boolean
 from numba.extending import overload
@@ -1244,65 +1245,163 @@ def convert_gerg2008_to_dictionary(gerg2008_composition: np.ndarray) -> OrderedD
     return gas_mixture_composition
 
 
-class GasMixtureGERG2008:
-    def __init__(
-        self,
-        P_Pa: float,
-        T_K: float,
-        composition: np.ndarray,
-        T_ref_dens_degreeC: float = 0.0,
-        T_ref_comb_degreeC: float = 25.0,
-    ):
-        from scipy.constants import atm, zero_Celsius
-        from GasNetSim.components.gas_mixture.functions.heating_values.heating_value import CalculateHeatingValue_numba
+@dataclass(eq=False)
+class GERG2008Properties:
+    P: float
+    T: float
+    x: np.ndarray
+    ref_temp_props_K: float
+    ref_temp_comb_water_C: float
+    MolarMass: float
+    MolarDensity: float
+    rho: float
+    SG: float
+    Z: float
+    standard_density: float
+    dPdD: float
+    d2PdD2: float
+    dPdT: float
+    energy: float
+    enthalpy: float
+    entropy: float
+    Cv_molar: float
+    Cp_molar: float
+    Cp: float
+    Cv: float
+    c: float
+    gibbs_energy: float
+    JT: float
+    isentropic_exponent: float
+    R_specific: float
+    HHV_J_per_m3: float
+    HHV_J_per_sm3: float
+    HHV_J_per_kg: float
+    LHV_J_per_m3: float
+    LHV_J_per_sm3: float
+    LHV_J_per_kg: float
 
-        self.dPdT = None
-        self.d2PdD2 = None
-        self.dPdD = None
-        self.P = P_Pa / 1000.0  # Pa -> kPa
-        self.T = T_K
-        self.ref_temp_props_K = T_ref_dens_degreeC + zero_Celsius
-        self.ref_temp_comb_water_C = T_ref_comb_degreeC
-        self.x = composition
 
-        properties = PropertiesGERG_numba(T=self.T, P=self.P, x=self.x)
-        self.MolarMass = properties[0]
-        self.MolarDensity = properties[1]
-        self.rho = properties[17]  # kg/m3
-        self.SG = properties[18]
-        self.Z = properties[2]
-        self.standard_density = self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K * self.Z
-        self.dPdD = properties[3]
-        self.d2PdD2 = properties[4]
-        self.dPdT = properties[5]
-        self.energy = properties[6]
-        self.enthalpy = properties[7]
-        self.entropy = properties[8]
-        self.Cv_molar = properties[9]
-        self.Cp_molar = properties[10]
-        self.Cp = properties[12]
-        self.Cv = properties[11]
-        self.c = properties[13]
-        self.gibbs_energy = properties[14]
-        self.JT = properties[15]
-        self.isentropic_exponent = properties[16]
-        self.R_specific = properties[19]
+def calculate_gerg2008_properties(
+    P_Pa: float,
+    T_K: float,
+    composition: np.ndarray,
+    T_ref_dens_degreeC: float = 0.0,
+    T_ref_comb_degreeC: float = 25.0,
+) -> GERG2008Properties:
+    from scipy.constants import atm, zero_Celsius
+    from GasNetSim.components.gas_mixture.thermochemistry.heating_value import CalculateHeatingValue_numba
 
-        self.HHV_J_per_m3 = CalculateHeatingValue_numba(
-            MolarMass=self.MolarMass, MolarDensity=self.MolarDensity,
-            comp=composition, hhv=True, per_mass=False, reference_temp=self.ref_temp_comb_water_C,
-        )
-        self.HHV_J_per_sm3 = self.HHV_J_per_m3 / self.P / 1000 * atm / self.ref_temp_props_K * self.T * self.Z
-        self.HHV_J_per_kg = CalculateHeatingValue_numba(
-            MolarMass=self.MolarMass, MolarDensity=self.MolarDensity,
-            comp=composition, hhv=True, per_mass=True, reference_temp=self.ref_temp_comb_water_C,
-        )
-        self.LHV_J_per_m3 = CalculateHeatingValue_numba(
-            MolarMass=self.MolarMass, MolarDensity=self.MolarDensity,
-            comp=composition, hhv=False, per_mass=False, reference_temp=self.ref_temp_comb_water_C,
-        )
-        self.LHV_J_per_sm3 = self.LHV_J_per_m3 / self.P / 1000 * atm / self.ref_temp_props_K * self.T * self.Z
-        self.LHV_J_per_kg = CalculateHeatingValue_numba(
-            MolarMass=self.MolarMass, MolarDensity=self.MolarDensity,
-            comp=composition, hhv=False, per_mass=True, reference_temp=self.ref_temp_comb_water_C,
-        )
+    pressure_kpa = P_Pa / 1000.0
+    temperature_k = T_K
+    ref_temp_props_K = T_ref_dens_degreeC + zero_Celsius
+    composition_array = np.array(composition, dtype=float, copy=True)
+
+    properties = PropertiesGERG_numba(T=temperature_k, P=pressure_kpa, x=composition_array)
+    molar_mass = properties[0]
+    molar_density = properties[1]
+    rho = properties[17]
+    sg = properties[18]
+    z_factor = properties[2]
+    standard_density = rho * temperature_k / pressure_kpa / 1e3 * atm / ref_temp_props_K * z_factor
+    dPdD = properties[3]
+    d2PdD2 = properties[4]
+    dPdT = properties[5]
+    energy = properties[6]
+    enthalpy = properties[7]
+    entropy = properties[8]
+    cv_molar = properties[9]
+    cp_molar = properties[10]
+    cv = properties[11]
+    cp = properties[12]
+    speed_of_sound = properties[13]
+    gibbs_energy = properties[14]
+    jt = properties[15]
+    isentropic_exponent = properties[16]
+    r_specific = properties[19]
+
+    hhv_j_per_m3 = CalculateHeatingValue_numba(
+        MolarMass=molar_mass,
+        MolarDensity=molar_density,
+        comp=composition_array,
+        hhv=True,
+        per_mass=False,
+        reference_temp=T_ref_comb_degreeC,
+    )
+    hhv_j_per_sm3 = hhv_j_per_m3 / pressure_kpa / 1000 * atm / ref_temp_props_K * temperature_k * z_factor
+    hhv_j_per_kg = CalculateHeatingValue_numba(
+        MolarMass=molar_mass,
+        MolarDensity=molar_density,
+        comp=composition_array,
+        hhv=True,
+        per_mass=True,
+        reference_temp=T_ref_comb_degreeC,
+    )
+    lhv_j_per_m3 = CalculateHeatingValue_numba(
+        MolarMass=molar_mass,
+        MolarDensity=molar_density,
+        comp=composition_array,
+        hhv=False,
+        per_mass=False,
+        reference_temp=T_ref_comb_degreeC,
+    )
+    lhv_j_per_sm3 = lhv_j_per_m3 / pressure_kpa / 1000 * atm / ref_temp_props_K * temperature_k * z_factor
+    lhv_j_per_kg = CalculateHeatingValue_numba(
+        MolarMass=molar_mass,
+        MolarDensity=molar_density,
+        comp=composition_array,
+        hhv=False,
+        per_mass=True,
+        reference_temp=T_ref_comb_degreeC,
+    )
+
+    return GERG2008Properties(
+        P=pressure_kpa,
+        T=temperature_k,
+        x=composition_array,
+        ref_temp_props_K=ref_temp_props_K,
+        ref_temp_comb_water_C=T_ref_comb_degreeC,
+        MolarMass=molar_mass,
+        MolarDensity=molar_density,
+        rho=rho,
+        SG=sg,
+        Z=z_factor,
+        standard_density=standard_density,
+        dPdD=dPdD,
+        d2PdD2=d2PdD2,
+        dPdT=dPdT,
+        energy=energy,
+        enthalpy=enthalpy,
+        entropy=entropy,
+        Cv_molar=cv_molar,
+        Cp_molar=cp_molar,
+        Cp=cp,
+        Cv=cv,
+        c=speed_of_sound,
+        gibbs_energy=gibbs_energy,
+        JT=jt,
+        isentropic_exponent=isentropic_exponent,
+        R_specific=r_specific,
+        HHV_J_per_m3=hhv_j_per_m3,
+        HHV_J_per_sm3=hhv_j_per_sm3,
+        HHV_J_per_kg=hhv_j_per_kg,
+        LHV_J_per_m3=lhv_j_per_m3,
+        LHV_J_per_sm3=lhv_j_per_sm3,
+        LHV_J_per_kg=lhv_j_per_kg,
+    )
+
+
+def GasMixtureGERG2008(
+    P_Pa: float,
+    T_K: float,
+    composition: np.ndarray,
+    T_ref_dens_degreeC: float = 0.0,
+    T_ref_comb_degreeC: float = 25.0,
+) -> GERG2008Properties:
+    """Legacy compatibility wrapper for callers that still use the old constructor name."""
+    return calculate_gerg2008_properties(
+        P_Pa=P_Pa,
+        T_K=T_K,
+        composition=composition,
+        T_ref_dens_degreeC=T_ref_dens_degreeC,
+        T_ref_comb_degreeC=T_ref_comb_degreeC,
+    )

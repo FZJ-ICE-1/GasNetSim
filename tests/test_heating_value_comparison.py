@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_almost_equal, assert_allclose
 from scipy.constants import bar
-from GasNetSim.components.gas_mixture.GERG2008 import *
+from GasNetSim.components.gas_mixture.eos import *
 
 TEMPERATURE = 298  # Kelvin
 PRESSURE = 1 * bar  # Pressure in Pascals

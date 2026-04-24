@@ -12,7 +12,7 @@ from numpy.testing import assert_almost_equal
 from scipy.constants import bar
 from tqdm import tqdm
 
-from GasNetSim.components.gas_mixture import GasMixture
+from GasNetSim.components.gas_mixture import calculate_gas_mixture
 from GasNetSim.components.utils.pipeline_function.outlet_temperature import *
 
 
@@ -22,7 +22,7 @@ def test_pipeline_outlet_temperature_calculation():
     #               2: Node(node_index=2, pressure_pa=48 * bar, temperature=300, node_type='reference')}
     # test_pipeline = Pipeline(test_nodes[1], test_nodes[2], diameter=0.5, length=500*1e3)
 
-    gas_mixture = GasMixture(
+    gas_mixture = calculate_gas_mixture(
         temperature=300,
         pressure=50 * bar,
         composition={"methane": 0.9, "hydrogen": 0.1},
