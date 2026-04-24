@@ -74,14 +74,13 @@ _enthalpy_values = load_enthalpy_values()
 
 
 @njit
-def _CalculateHeatingValue_numba_impl(MolarMass, MolarDensity, comp, hhv, per_mass, enthalpy_mole):
+def _CalculateHeatingValuesMolar_numba_impl(comp, enthalpy_mole):
     atom_list = number_of_atoms * comp[:, np.newaxis]
     reactants_atom = np.sum(atom_list, axis=0)
 
     n_CO2 = reactants_atom[1]
     n_SO2 = reactants_atom[6]
     n_H2O = reactants_atom[2] / 2
-    products = np.array([n_CO2, n_SO2, n_H2O], dtype=np.float64)
 
     n_O = n_CO2 * 2 + n_SO2 * 2 + n_H2O
     n_O2 = n_O / 2
@@ -95,14 +94,21 @@ def _CalculateHeatingValue_numba_impl(MolarMass, MolarDensity, comp, hhv, per_ma
             reactants_enthalpy_sum += reactants[i] * enthalpy_mole[i]
 
     products_enthalpy_sum = (
-        products[0] * enthalpy_mole[2]
-        + products[1] * enthalpy_mole[21]
-        + products[2] * enthalpy_mole[17]
+        n_CO2 * enthalpy_mole[2]
+        + n_SO2 * enthalpy_mole[21]
+        + n_H2O * enthalpy_mole[17]
     )
     LHV = reactants_enthalpy_sum - products_enthalpy_sum
 
     hw_liq, hw_gas = enthalpy_mole[22], enthalpy_mole[17]
-    HHV = LHV + (hw_gas - hw_liq) * products[2]
+    HHV = LHV + (hw_gas - hw_liq) * n_H2O
+
+    return LHV, HHV
+
+
+@njit
+def _CalculateHeatingValue_numba_impl(MolarMass, MolarDensity, comp, hhv, per_mass, enthalpy_mole):
+    LHV, HHV = _CalculateHeatingValuesMolar_numba_impl(comp, enthalpy_mole)
 
     if per_mass:
         if hhv:
@@ -114,10 +120,7 @@ def _CalculateHeatingValue_numba_impl(MolarMass, MolarDensity, comp, hhv, per_ma
     return LHV * MolarDensity * 1e3
 
 
-def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv=True, per_mass=True, reference_temp=25.0):
-    """
-    Calculate the heating value of a gas mixture based on its composition and other properties.
-    """
+def _prepare_enthalpy_inputs(comp, reference_temp):
     if reference_temp not in REF_TEMP_COMBUSTION:
         raise ValueError(
             f"Unsupported reference temperature: {reference_temp} degree Celsius. "
@@ -133,6 +136,26 @@ def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv=True, per_mas
         comp = np.asarray(comp, dtype=np.float64)
     elif comp.dtype != np.float64:
         comp = comp.astype(np.float64)
+
+    return comp, enthalpy_array
+
+
+def CalculateHeatingValuesMolar_numba(comp, reference_temp=25.0):
+    """
+    Calculate lower and higher molar heating values for a gas composition.
+
+    Returns:
+        tuple[float, float]: LHV and HHV in J/mol.
+    """
+    comp, enthalpy_array = _prepare_enthalpy_inputs(comp, reference_temp)
+    return _CalculateHeatingValuesMolar_numba_impl(comp, enthalpy_array)
+
+
+def CalculateHeatingValue_numba(MolarMass, MolarDensity, comp, hhv=True, per_mass=True, reference_temp=25.0):
+    """
+    Calculate the heating value of a gas mixture based on its composition and other properties.
+    """
+    comp, enthalpy_array = _prepare_enthalpy_inputs(comp, reference_temp)
 
     return _CalculateHeatingValue_numba_impl(
         float(MolarMass),

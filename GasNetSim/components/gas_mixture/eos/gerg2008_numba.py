@@ -1289,7 +1289,7 @@ def calculate_gerg2008_properties(
     T_ref_comb_degreeC: float = 25.0,
 ) -> GERG2008Properties:
     from scipy.constants import atm, zero_Celsius
-    from GasNetSim.components.gas_mixture.thermochemistry.heating_value import CalculateHeatingValue_numba
+    from GasNetSim.components.gas_mixture.thermochemistry.heating_value import CalculateHeatingValuesMolar_numba
 
     pressure_kpa = P_Pa / 1000.0
     temperature_k = T_K
@@ -1319,40 +1319,17 @@ def calculate_gerg2008_properties(
     isentropic_exponent = properties[16]
     r_specific = properties[19]
 
-    hhv_j_per_m3 = CalculateHeatingValue_numba(
-        MolarMass=molar_mass,
-        MolarDensity=molar_density,
+    lhv_molar, hhv_molar = CalculateHeatingValuesMolar_numba(
         comp=composition_array,
-        hhv=True,
-        per_mass=False,
         reference_temp=T_ref_comb_degreeC,
     )
+
+    hhv_j_per_m3 = hhv_molar * molar_density * 1e3
     hhv_j_per_sm3 = hhv_j_per_m3 / pressure_kpa / 1000 * atm / ref_temp_props_K * temperature_k * z_factor
-    hhv_j_per_kg = CalculateHeatingValue_numba(
-        MolarMass=molar_mass,
-        MolarDensity=molar_density,
-        comp=composition_array,
-        hhv=True,
-        per_mass=True,
-        reference_temp=T_ref_comb_degreeC,
-    )
-    lhv_j_per_m3 = CalculateHeatingValue_numba(
-        MolarMass=molar_mass,
-        MolarDensity=molar_density,
-        comp=composition_array,
-        hhv=False,
-        per_mass=False,
-        reference_temp=T_ref_comb_degreeC,
-    )
+    hhv_j_per_kg = hhv_molar / molar_mass * 1e3
+    lhv_j_per_m3 = lhv_molar * molar_density * 1e3
     lhv_j_per_sm3 = lhv_j_per_m3 / pressure_kpa / 1000 * atm / ref_temp_props_K * temperature_k * z_factor
-    lhv_j_per_kg = CalculateHeatingValue_numba(
-        MolarMass=molar_mass,
-        MolarDensity=molar_density,
-        comp=composition_array,
-        hhv=False,
-        per_mass=True,
-        reference_temp=T_ref_comb_degreeC,
-    )
+    lhv_j_per_kg = lhv_molar / molar_mass * 1e3
 
     return GERG2008Properties(
         P=pressure_kpa,
