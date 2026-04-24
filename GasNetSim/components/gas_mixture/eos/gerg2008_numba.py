@@ -1251,7 +1251,6 @@ class GERG2008Properties:
     T: float
     x: np.ndarray
     ref_temp_props_K: float
-    ref_temp_comb_water_C: float
     MolarMass: float
     MolarDensity: float
     rho: float
@@ -1273,12 +1272,6 @@ class GERG2008Properties:
     JT: float
     isentropic_exponent: float
     R_specific: float
-    HHV_J_per_m3: float
-    HHV_J_per_sm3: float
-    HHV_J_per_kg: float
-    LHV_J_per_m3: float
-    LHV_J_per_sm3: float
-    LHV_J_per_kg: float
 
 
 def calculate_gerg2008_properties(
@@ -1286,10 +1279,8 @@ def calculate_gerg2008_properties(
     T_K: float,
     composition: np.ndarray,
     T_ref_dens_degreeC: float = 0.0,
-    T_ref_comb_degreeC: float = 25.0,
 ) -> GERG2008Properties:
     from scipy.constants import atm, zero_Celsius
-    from GasNetSim.components.gas_mixture.thermochemistry.heating_value import CalculateHeatingValuesMolar_numba
 
     pressure_kpa = P_Pa / 1000.0
     temperature_k = T_K
@@ -1319,24 +1310,11 @@ def calculate_gerg2008_properties(
     isentropic_exponent = properties[16]
     r_specific = properties[19]
 
-    lhv_molar, hhv_molar = CalculateHeatingValuesMolar_numba(
-        comp=composition_array,
-        reference_temp=T_ref_comb_degreeC,
-    )
-
-    hhv_j_per_m3 = hhv_molar * molar_density * 1e3
-    hhv_j_per_sm3 = hhv_j_per_m3 / pressure_kpa / 1000 * atm / ref_temp_props_K * temperature_k * z_factor
-    hhv_j_per_kg = hhv_molar / molar_mass * 1e3
-    lhv_j_per_m3 = lhv_molar * molar_density * 1e3
-    lhv_j_per_sm3 = lhv_j_per_m3 / pressure_kpa / 1000 * atm / ref_temp_props_K * temperature_k * z_factor
-    lhv_j_per_kg = lhv_molar / molar_mass * 1e3
-
     return GERG2008Properties(
         P=pressure_kpa,
         T=temperature_k,
         x=composition_array,
         ref_temp_props_K=ref_temp_props_K,
-        ref_temp_comb_water_C=T_ref_comb_degreeC,
         MolarMass=molar_mass,
         MolarDensity=molar_density,
         rho=rho,
@@ -1358,12 +1336,6 @@ def calculate_gerg2008_properties(
         JT=jt,
         isentropic_exponent=isentropic_exponent,
         R_specific=r_specific,
-        HHV_J_per_m3=hhv_j_per_m3,
-        HHV_J_per_sm3=hhv_j_per_sm3,
-        HHV_J_per_kg=hhv_j_per_kg,
-        LHV_J_per_m3=lhv_j_per_m3,
-        LHV_J_per_sm3=lhv_j_per_sm3,
-        LHV_J_per_kg=lhv_j_per_kg,
     )
 
 
@@ -1372,7 +1344,6 @@ def GasMixtureGERG2008(
     T_K: float,
     composition: np.ndarray,
     T_ref_dens_degreeC: float = 0.0,
-    T_ref_comb_degreeC: float = 25.0,
 ) -> GERG2008Properties:
     """Legacy compatibility wrapper for callers that still use the old constructor name."""
     return calculate_gerg2008_properties(
@@ -1380,5 +1351,4 @@ def GasMixtureGERG2008(
         T_K=T_K,
         composition=composition,
         T_ref_dens_degreeC=T_ref_dens_degreeC,
-        T_ref_comb_degreeC=T_ref_comb_degreeC,
     )

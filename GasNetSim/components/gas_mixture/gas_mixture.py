@@ -11,12 +11,14 @@ from dataclasses import dataclass
 from typing import Mapping, Union
 
 import numpy as np
+from scipy.constants import atm
 
 from .eos import (
     calculate_gerg2008_properties,
     convert_gerg2008_to_dictionary,
     convert_to_gerg2008_composition,
 )
+from .thermochemistry import CalculateHeatingValuesMolar_numba
 from .viscosity import ViscosityMethod, calculate_viscosity
 
 
@@ -45,6 +47,9 @@ class GasMixture:
     HHV_J_per_m3: float = None
     HHV_J_per_sm3: float = None
     HHV_J_per_kg: float = None
+    LHV_J_per_m3: float = None
+    LHV_J_per_sm3: float = None
+    LHV_J_per_kg: float = None
     Z: float = None
     SG: float = None
     MolarMass: float = None
@@ -60,6 +65,8 @@ def calculate_gas_mixture(
     composition: CompositionInput,
     method: str = "GERG-2008",
     viscosity_method: str = "Herning-Zipperer",
+    T_ref_dens_degreeC: float = 0.0,
+    T_ref_comb_degreeC: float = 25.0,
 ) -> GasMixture:
     """
     Calculate EOS-backed gas mixture properties.
@@ -70,6 +77,8 @@ def calculate_gas_mixture(
         composition: Component mole fractions as a dictionary or GERG-2008 array.
         method: EOS method. Currently only GERG-2008 is supported.
         viscosity_method: Viscosity calculation method.
+        T_ref_dens_degreeC: Reference temperature for standard density and volume conversions [degC].
+        T_ref_comb_degreeC: Reference temperature for heating value calculation [degC].
     """
     if method != "GERG-2008":
         raise NotImplementedError(f"Gas mixture method {method!r} is not supported.")
@@ -79,6 +88,7 @@ def calculate_gas_mixture(
         P_Pa=pressure,
         T_K=temperature,
         composition=eos_composition,
+        T_ref_dens_degreeC=T_ref_dens_degreeC,
     )
 
     viscosity = calculate_viscosity(
@@ -87,6 +97,21 @@ def calculate_gas_mixture(
         eos_composition,
         _viscosity_method(viscosity_method),
     )
+    lhv_molar, hhv_molar = CalculateHeatingValuesMolar_numba(
+        eos_composition,
+        reference_temp=T_ref_comb_degreeC,
+    )
+    heating_value_sm3_factor = (
+        1.0
+        / eos_mixture.P
+        / 1000.0
+        * atm
+        / eos_mixture.ref_temp_props_K
+        * eos_mixture.T
+        * eos_mixture.Z
+    )
+    hhv_j_per_m3 = hhv_molar * eos_mixture.MolarDensity * 1e3
+    lhv_j_per_m3 = lhv_molar * eos_mixture.MolarDensity * 1e3
 
     return GasMixture(
         pressure=pressure,
@@ -104,9 +129,12 @@ def calculate_gas_mixture(
         viscosity=viscosity,
         heat_capacity_constant_pressure=eos_mixture.Cp,
         R_specific=eos_mixture.R_specific,
-        HHV_J_per_m3=eos_mixture.HHV_J_per_m3,
-        HHV_J_per_sm3=eos_mixture.HHV_J_per_sm3,
-        HHV_J_per_kg=eos_mixture.HHV_J_per_kg,
+        HHV_J_per_m3=hhv_j_per_m3,
+        HHV_J_per_sm3=hhv_j_per_m3 * heating_value_sm3_factor,
+        HHV_J_per_kg=hhv_molar / eos_mixture.MolarMass * 1e3,
+        LHV_J_per_m3=lhv_j_per_m3,
+        LHV_J_per_sm3=lhv_j_per_m3 * heating_value_sm3_factor,
+        LHV_J_per_kg=lhv_molar / eos_mixture.MolarMass * 1e3,
         Z=eos_mixture.Z,
         SG=eos_mixture.SG,
         MolarMass=eos_mixture.MolarMass,

@@ -15,6 +15,7 @@ from .eos import (
 )
 from .thermochemistry import (
     CalculateHeatingValue_numba,
+    CalculateHeatingValuesMolar_numba,
     calculate_absolute_enthalpies,
     load_enthalpy_values,
 )
