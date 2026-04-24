@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Mapping, Union
 
 import numpy as np
-from scipy.constants import atm
+from scipy.constants import atm, zero_Celsius
 
 from .eos import (
     calculate_gerg2008_properties,
@@ -88,7 +88,6 @@ def calculate_gas_mixture(
         P_Pa=pressure,
         T_K=temperature,
         composition=eos_composition,
-        T_ref_dens_degreeC=T_ref_dens_degreeC,
     )
 
     viscosity = calculate_viscosity(
@@ -101,13 +100,23 @@ def calculate_gas_mixture(
         eos_composition,
         reference_temp=T_ref_comb_degreeC,
     )
+    ref_temp_props_K = T_ref_dens_degreeC + zero_Celsius
     heating_value_sm3_factor = (
         1.0
         / eos_mixture.P
         / 1000.0
         * atm
-        / eos_mixture.ref_temp_props_K
+        / ref_temp_props_K
         * eos_mixture.T
+        * eos_mixture.Z
+    )
+    standard_density = (
+        eos_mixture.rho
+        * eos_mixture.T
+        / eos_mixture.P
+        / 1e3
+        * atm
+        / ref_temp_props_K
         * eos_mixture.Z
     )
     hhv_j_per_m3 = hhv_molar * eos_mixture.MolarDensity * 1e3
@@ -124,7 +133,7 @@ def calculate_gas_mixture(
         specific_gravity=eos_mixture.SG,
         molar_mass=eos_mixture.MolarMass,
         density=eos_mixture.rho,
-        standard_density=eos_mixture.standard_density,
+        standard_density=standard_density,
         joule_thomson_coefficient=eos_mixture.JT,
         viscosity=viscosity,
         heat_capacity_constant_pressure=eos_mixture.Cp,

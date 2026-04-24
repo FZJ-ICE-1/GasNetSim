@@ -1250,13 +1250,11 @@ class GERG2008Properties:
     P: float
     T: float
     x: np.ndarray
-    ref_temp_props_K: float
     MolarMass: float
     MolarDensity: float
     rho: float
     SG: float
     Z: float
-    standard_density: float
     dPdD: float
     d2PdD2: float
     dPdT: float
@@ -1278,13 +1276,9 @@ def calculate_gerg2008_properties(
     P_Pa: float,
     T_K: float,
     composition: np.ndarray,
-    T_ref_dens_degreeC: float = 0.0,
 ) -> GERG2008Properties:
-    from scipy.constants import atm, zero_Celsius
-
     pressure_kpa = P_Pa / 1000.0
     temperature_k = T_K
-    ref_temp_props_K = T_ref_dens_degreeC + zero_Celsius
     composition_array = np.array(composition, dtype=float, copy=True)
 
     properties = PropertiesGERG_numba(T=temperature_k, P=pressure_kpa, x=composition_array)
@@ -1293,7 +1287,6 @@ def calculate_gerg2008_properties(
     rho = properties[17]
     sg = properties[18]
     z_factor = properties[2]
-    standard_density = rho * temperature_k / pressure_kpa / 1e3 * atm / ref_temp_props_K * z_factor
     dPdD = properties[3]
     d2PdD2 = properties[4]
     dPdT = properties[5]
@@ -1314,13 +1307,11 @@ def calculate_gerg2008_properties(
         P=pressure_kpa,
         T=temperature_k,
         x=composition_array,
-        ref_temp_props_K=ref_temp_props_K,
         MolarMass=molar_mass,
         MolarDensity=molar_density,
         rho=rho,
         SG=sg,
         Z=z_factor,
-        standard_density=standard_density,
         dPdD=dPdD,
         d2PdD2=d2PdD2,
         dPdT=dPdT,
@@ -1343,12 +1334,10 @@ def GasMixtureGERG2008(
     P_Pa: float,
     T_K: float,
     composition: np.ndarray,
-    T_ref_dens_degreeC: float = 0.0,
 ) -> GERG2008Properties:
     """Legacy compatibility wrapper for callers that still use the old constructor name."""
     return calculate_gerg2008_properties(
         P_Pa=P_Pa,
         T_K=T_K,
         composition=composition,
-        T_ref_dens_degreeC=T_ref_dens_degreeC,
     )
