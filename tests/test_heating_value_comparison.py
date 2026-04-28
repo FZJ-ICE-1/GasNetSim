@@ -11,10 +11,48 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_almost_equal, assert_allclose
 from scipy.constants import bar
+from GasNetSim.components.gas_mixture import CalculateHeatingValue_numba
 from GasNetSim.components.gas_mixture.eos import *
 
 TEMPERATURE = 298  # Kelvin
 PRESSURE = 1 * bar  # Pressure in Pascals
+
+
+def gerg2008_heating_values(gas_mixture, composition):
+    """Return LHV/HHV by mass and volume for GERG-2008 properties."""
+    lhv_mass = CalculateHeatingValue_numba(
+        gas_mixture.MolarMass,
+        gas_mixture.MolarDensity,
+        composition,
+        hhv=False,
+        per_mass=True,
+        reference_temp=25.0,
+    )
+    hhv_mass = CalculateHeatingValue_numba(
+        gas_mixture.MolarMass,
+        gas_mixture.MolarDensity,
+        composition,
+        hhv=True,
+        per_mass=True,
+        reference_temp=25.0,
+    )
+    lhv_vol = CalculateHeatingValue_numba(
+        gas_mixture.MolarMass,
+        gas_mixture.MolarDensity,
+        composition,
+        hhv=False,
+        per_mass=False,
+        reference_temp=25.0,
+    )
+    hhv_vol = CalculateHeatingValue_numba(
+        gas_mixture.MolarMass,
+        gas_mixture.MolarDensity,
+        composition,
+        hhv=True,
+        per_mass=False,
+        reference_temp=25.0,
+    )
+    return lhv_mass, hhv_mass, lhv_vol, hhv_vol
 
 
 def heating_value(fuel, gas):
@@ -133,14 +171,11 @@ def test_heating_values_gerg2008(setup_gas_comp):
         gas_mixture = GasMixtureGERG2008(
             P_Pa=PRESSURE, T_K=TEMPERATURE, composition=x
         )
-        HHV = gas_mixture.HHV_J_per_kg
-        LHV = gas_mixture.LHV_J_per_kg
+        LHV, HHV, LHV_vol, HHV_vol = gerg2008_heating_values(gas_mixture, x)
         LHV_gerg2008_mass.append(LHV)
         HHV_gerg2008_mass.append(HHV)
-        HHV = gas_mixture.HHV_J_per_m3
-        LHV = gas_mixture.LHV_J_per_m3
-        LHV_gerg2008_vol.append(LHV)
-        HHV_gerg2008_vol.append(HHV)
+        LHV_gerg2008_vol.append(LHV_vol)
+        HHV_gerg2008_vol.append(HHV_vol)
 
     assert len(LHV_gerg2008_mass) == len(gas_comp)
     assert len(HHV_gerg2008_mass) == len(gas_comp)
@@ -175,14 +210,11 @@ def test_comparisons(setup_cantera_water, setup_fuels, setup_gas_comp):
         gas_mixture = GasMixtureGERG2008(
             P_Pa=PRESSURE, T_K=TEMPERATURE, composition=x
         )
-        HHV = gas_mixture.HHV_J_per_kg
-        LHV = gas_mixture.LHV_J_per_kg
+        LHV, HHV, LHV_vol, HHV_vol = gerg2008_heating_values(gas_mixture, x)
         LHV_gerg2008_mass.append(LHV)
         HHV_gerg2008_mass.append(HHV)
-        HHV = gas_mixture.HHV_J_per_m3
-        LHV = gas_mixture.LHV_J_per_m3
-        LHV_gerg2008_vol.append(LHV)
-        HHV_gerg2008_vol.append(HHV)
+        LHV_gerg2008_vol.append(LHV_vol)
+        HHV_gerg2008_vol.append(HHV_vol)
 
     # Comparison assertions
     assert_allclose(LHV_cantera_mass, LHV_gerg2008_mass, rtol=0.01)
