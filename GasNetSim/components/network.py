@@ -18,6 +18,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from collections import OrderedDict
 
 # from .utils.gas_mixture.heating_value import *
+from .gas_mixture.gas_mixture import calculate_gas_mixture
 from .utils.utils import *
 from .node import *
 from .pipeline import *
@@ -350,7 +351,7 @@ class Network:
     # def convert_energy_flow_to_volumetric_flow(self, base='HHV'):
     #     for node in self.nodes.values():
     #         gas_comp = node.get_mole_fraction()
-    #         standard_density = GasMixture(pressure=101325, temperature=288.15, composition=gas_comp).density
+    #         standard_density = calculate_gas_mixture(pressure=101325, temperature=288.15, composition=gas_comp).density
     #         LHV, HHV = calc_heating_value(node.gas_mixture)
     #         if base == 'HHV':
     #             heating_value = HHV/1e6*standard_density  # MJ/sm3
@@ -598,7 +599,7 @@ class Network:
         #         pass
         #     elif node.flow_type == 'energy':
         #         gas_comp = node.get_mole_fraction()
-        #         node.flow = node.flow / HHV * 1e6 / GasMixture(composition=gas_comp,
+        #         node.flow = node.flow / HHV * 1e6 / calculate_gas_mixture(composition=gas_comp,
         #                                                        temperature=288.15,
         #                                                        pressure=101325).density
         #         logging.debug(node.flow)
@@ -762,9 +763,14 @@ class Network:
             node_id = self.simulation_node_index_to_node_id(i)
             self.nodes[node_id].pressure = pressure[i]
             self.nodes[node_id].volumetric_flow = flow[i]
-            self.nodes[node_id].gas_mixture.pressure = self.nodes[node_id].pressure
-            self.nodes[node_id].gas_mixture.temperature = self.nodes[node_id].temperature
-            self.nodes[node_id].gas_mixture.update_gas_mixture()
+            gas_mixture = self.nodes[node_id].gas_mixture
+            self.nodes[node_id].gas_mixture = calculate_gas_mixture(
+                pressure=self.nodes[node_id].pressure,
+                temperature=self.nodes[node_id].temperature,
+                composition=gas_mixture.eos_composition,
+                method=gas_mixture.method,
+                viscosity_method=gas_mixture.viscosity_method,
+            )
             # self.nodes[node_id].update_gas_mixture()
 
             if self.nodes[node_id].flow_type == "volumetric":

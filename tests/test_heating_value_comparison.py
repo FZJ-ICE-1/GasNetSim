@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_almost_equal, assert_allclose
 from scipy.constants import bar
-from GasNetSim.components.gas_mixture.GERG2008 import *
+from GasNetSim.components.gas_mixture.eos import *
 
 TEMPERATURE = 298  # Kelvin
 PRESSURE = 1 * bar  # Pressure in Pascals
@@ -131,7 +131,7 @@ def test_heating_values_gerg2008(setup_gas_comp):
     for key, value in gas_comp.items():
         x = convert_to_gerg2008_composition(OrderedDict({key: value}))
         gas_mixture = GasMixtureGERG2008(
-            P_Pa=PRESSURE, T_K=TEMPERATURE, composition=x, use_numba=True
+            P_Pa=PRESSURE, T_K=TEMPERATURE, composition=x
         )
         HHV = gas_mixture.HHV_J_per_kg
         LHV = gas_mixture.LHV_J_per_kg
@@ -173,7 +173,7 @@ def test_comparisons(setup_cantera_water, setup_fuels, setup_gas_comp):
     for key, value in gas_comp.items():
         x = convert_to_gerg2008_composition(OrderedDict({key: value}))
         gas_mixture = GasMixtureGERG2008(
-            P_Pa=PRESSURE, T_K=TEMPERATURE, composition=x, use_numba=True
+            P_Pa=PRESSURE, T_K=TEMPERATURE, composition=x
         )
         HHV = gas_mixture.HHV_J_per_kg
         LHV = gas_mixture.LHV_J_per_kg

@@ -7,6 +7,10 @@
 #     Last change by yifei
 #    *****************************************************************************
 
+# This file contains software originally developed by employees of the National
+# Institute of Standards and Technology (NIST). See the NOTICE file at the root
+# of this repository for the full NIST license and disclaimer of warranty.
+#
 # """
 # Version 2.01 of routines for the calculation of thermodynamic
 # properties from the AGA 8 Part 2 GERG-2008 equation of state.
@@ -104,7 +108,9 @@ from copy import deepcopy
 from scipy.constants import atm
 
 from .setup import *
-from .gerg2008_constants import gerg_gas_spices
+from GasNetSim.components.gas_mixture.eos.gerg2008_constants import (
+    gerg_gas_spices,
+)
 
 
 def Tanh(xx):
@@ -253,237 +259,45 @@ The compositions in the x() array use the following order and must be sent as mo
 """
 
 
-class GasMixtureGERG2008:
+class GasMixtureGERG2008Reference:
     def __init__(
         self,
         P_Pa: float,
         T_K: float,
         composition: np.array,
-        use_numba: bool = True,
         T_ref_dens_degreeC: float = 0.0,
         T_ref_comb_degreeC: float = 25.0,
     ):
-        # Input parameters
         self.dPdT = None
         self.d2PdD2 = None
         self.dPdD = None
         self.P = P_Pa / 1000.0  # Pa -> kPa
-
         self.T = T_K
-
         self.ref_temp_props_K = T_ref_dens_degreeC + zero_Celsius
         self.ref_temp_comb_water_C = T_ref_comb_degreeC
+        self.x = np.insert(composition, 0, 0)
 
-        if use_numba:
-            # from .gerg2008_numba import ConvertCompositionGERG_numba
-            self.x = composition  # gas composition
-        else:
-            self.x = np.insert(composition, 0, 0)  # gas composition
+        self.PropertiesGERG()
+        self.standard_density = self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K
 
-        # # Calculated properties
-        # self.MolarMass = self.MolarMassGERG()
-        # # self.MolarDensity = self.DensityGERG(iFlag=0)[2]
-        # self.MolarDensity = 0
-        # self.rho = 0
-        # self.SG = 1
-        # self.Z = 1
-        # self.energy = 0
-        # self.enthalpy = 0
-        # self.entropy = 0
-        # self.Cv_molar = 0  # molar isochoric heat capacity [J/mol-K]
-        # self.Cp_molar = 0  # molar isobaric heat capacity [J/mol-K]
-        # self.Cp = 0  # isochoric heat capacity [J/kg-K]
-        # self.Cv = 0  # isobaric heat capacity [J/kg-K]
-        # self.c = 0  # speed of sound [m/s]
-        # self.gibbs_energy = 0  # Gibbs energy [J/mol]
-        #
-        # self.JT = 1  # Joule-Thomson coefficient [K/Pa]
-        # self.isentropic_exponent = 0  # Isentropic exponent
-        #
-        # self.R_specific = 0
-        # self.viscosity = 2e-4  # TODO add function
+        self.HHV_J_per_m3 = self.CalculateHeatingValue(comp=composition, hhv=True, parameter="volume")
+        self.HHV_J_per_sm3 = (
+            self.HHV_J_per_m3 / self.P / 1000 * atm / self.ref_temp_props_K * self.T * self.Z
+        )
+        self.HHV_J_per_kg = self.CalculateHeatingValue(comp=composition, hhv=True, parameter="mass")
+        self.LHV_J_per_m3 = self.CalculateHeatingValue(comp=composition, hhv=False, parameter="volume")
+        self.LHV_J_per_sm3 = (
+            self.LHV_J_per_m3 / self.P / 1000 * atm / self.ref_temp_props_K * self.T * self.Z
+        )
+        self.LHV_J_per_kg = self.CalculateHeatingValue(comp=composition, hhv=False, parameter="mass")
 
-        if use_numba:
-            from .gerg2008_numba import (
-                PropertiesGERG_numba,
-                CalculateHeatingValue_numba,
-            )
-
-            properties = PropertiesGERG_numba(T=self.T, P=self.P, x=self.x)
-            self.MolarMass = properties[0]
-            # self.MolarDensity = self.DensityGERG(iFlag=0)[2]
-            self.MolarDensity = properties[1]
-            self.rho = properties[17]  # kg/m3
-            self.SG = properties[18]
-            self.Z = properties[2]
-            self.standard_density = (
-                self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K * self.Z
-            )  # TODO: define global constants
-            self.dPdD = properties[3]
-            self.d2PdD2 = properties[4]
-            self.dPdT = properties[5]
-            self.energy = properties[6]
-            self.enthalpy = properties[7]
-            self.entropy = properties[8]
-            self.Cv_molar = properties[9]  # molar isochoric heat capacity [J/mol-K]
-            self.Cp_molar = properties[10]  # molar isobaric heat capacity [J/mol-K]
-            self.Cp = properties[12]  # isochoric heat capacity [J/kg-K]
-            self.Cv = properties[11]  # isobaric heat capacity [J/kg-K]
-            self.c = properties[13]  # speed of sound [m/s]
-            self.gibbs_energy = properties[14]  # Gibbs energy [J/mol]
-
-            self.JT = properties[15]  # Joule-Thomson coefficient [K/Pa]
-            self.isentropic_exponent = properties[16]  # Isentropic exponent
-
-            self.R_specific = properties[19]
-
-            self.HHV_J_per_m3 = CalculateHeatingValue_numba(
-                MolarMass=self.MolarMass,
-                MolarDensity=self.MolarDensity,
-                comp=composition,
-                hhv=True,
-                per_mass=False,
-                reference_temp=self.ref_temp_comb_water_C,
-            )
-            self.HHV_J_per_sm3 = (
-                self.HHV_J_per_m3
-                / self.P
-                / 1000
-                * atm
-                / self.ref_temp_props_K
-                * self.T
-                * self.Z
-            )
-            self.HHV_J_per_kg = CalculateHeatingValue_numba(
-                MolarMass=self.MolarMass,
-                MolarDensity=self.MolarDensity,
-                comp=composition,
-                hhv=True,
-                per_mass=True,
-                reference_temp=self.ref_temp_comb_water_C,
-            )
-            self.LHV_J_per_m3 = CalculateHeatingValue_numba(
-                MolarMass=self.MolarMass,
-                MolarDensity=self.MolarDensity,
-                comp=composition,
-                hhv=False,
-                per_mass=False,
-                reference_temp=self.ref_temp_comb_water_C,
-            )
-            self.LHV_J_per_sm3 = (
-                self.LHV_J_per_m3
-                / self.P
-                / 1000
-                * atm
-                / self.ref_temp_props_K
-                * self.T
-                * self.Z
-            )
-            self.LHV_J_per_kg = CalculateHeatingValue_numba(
-                MolarMass=self.MolarMass,
-                MolarDensity=self.MolarDensity,
-                comp=composition,
-                hhv=False,
-                per_mass=True,
-                reference_temp=self.ref_temp_comb_water_C,
-            )
-
-        else:
-            self.PropertiesGERG()
-            self.standard_density = (
-                self.rho * self.T / self.P / 1e3 * atm / self.ref_temp_props_K
-            )  # TODO: define global constants
-
-            self.HHV_J_per_m3 = self.CalculateHeatingValue(
-                comp=composition, hhv=True, parameter="volume"
-            )
-            self.HHV_J_per_sm3 = (
-                self.HHV_J_per_m3
-                / self.P
-                / 1000
-                * atm
-                / self.ref_temp_props_K
-                * self.T
-                * self.Z
-            )
-            self.HHV_J_per_kg = self.CalculateHeatingValue(
-                comp=composition, hhv=True, parameter="mass"
-            )
-            self.LHV_J_per_m3 = self.CalculateHeatingValue(
-                comp=composition, hhv=False, parameter="volume"
-            )
-            self.LHV_J_per_sm3 = (
-                self.LHV_J_per_m3
-                / self.P
-                / 1000
-                * atm
-                / self.ref_temp_props_K
-                * self.T
-                * self.Z
-            )
-            self.LHV_J_per_kg = self.CalculateHeatingValue(
-                comp=composition, hhv=False, parameter="mass"
-            )
-
-    def CalculateHeatingValue(self, comp, hhv, parameter):
-        # 298 K
-        # dict_enthalpy_mole = {'methane': -74602.416533355,
-        #                       'nitrogen': 0.0,
-        #                       'carbon dioxide': -393517.79827154,
-        #                       'ethane': -83856.2627150042,
-        #                       'propane': -103861.117481869,
-        #                       'isobutane': -135360.0,
-        #                       'n-butane': -125849.99999999999,
-        #                       'isopentane': -178400.0,
-        #                       'n-pentane': -173500.0,
-        #                       'n-hexane': -198490.0,
-        #                       'n-heptane': -223910.0,
-        #                       'n-hctane': -249730.0,
-        #                       'n-nonane': -274700.0,
-        #                       'n-decane': -300900.0,
-        #                       'hydrogen': 0.0,
-        #                       'oxygen': -4.40676212751828,
-        #                       'carbon monoxide': -110525.0,
-        #                       'water': -241833.418361837,
-        #                       'hydrogen sulfide': -20600.0,
-        #                       'helium': 0.0,
-        #                       'argon': 0.0,
-        #                       'carbon': 0.0}
-        #                       # 'H': 218000.0,
-        #                       # 'O': 249190.0,
-        #                       # 'SO2': -296840.0}
-
-        # 273 K
-        enthalpy_mole = np.array(
-            [
-                -75483.51423273719,  # methane
-                0.0,  # nitrogen
-                -394431.82606764464,  # carbon dioxide
-                -83856.2627150042,  # ethane
-                -103861.117481869,  # propane
-                -135360.0,  # isobutane
-                -125849.99999999999,  # n-butane
-                -178400.0,  # isopentane
-                -173500.0,  # n-pentane
-                -198490.0,  # n-hexane
-                -223910.0,  # n-heptane
-                -249730.0,  # n-octane
-                -274700.0,  # n-nonane
-                -300900.0,  # n-decane
-                0.0,  # hydrogen
-                -4.40676212751828,  # oxygen
-                -111262.34509634285,  # carbon monoxide
-                -242671.7203547155,  # water
-                -20600.0,  # hydrogen sulfide
-                0.0,  # helium
-                0.0,  # argon
-                -296840.0,
-            ]
-        )  # sulfur dioxide
-
+    def CalculateHeatingValue(self, comp, hhv, parameter, ref_temp=25.0):
+        from GasNetSim.components.gas_mixture.thermochemistry import load_enthalpy_values
         atom_list = number_of_atoms * comp[:, np.newaxis]
         reactants_atom = np.sum(atom_list, axis=0)
 
+        _enthalpy_values = load_enthalpy_values()
+        enthalpy_mole = _enthalpy_values[ref_temp]
         # products
         n_CO2 = reactants_atom[1]  # C
         n_SO2 = reactants_atom[6]  # S
@@ -500,13 +314,13 @@ class GasMixtureGERG2008:
         # reactants_dict.update({'oxygen': n_O2})
 
         # LHV calculation
-        LHV = (reactants_dict * enthalpy_mole[:-1]).sum() - (
+        LHV = (reactants_dict * enthalpy_mole[:-2]).sum() - (
             products_dict * enthalpy_mole[[2, 21, 17]]
         ).sum()
 
         # 298.15 K
-        hw_liq = -285839.09854950657
-        hw_gas = -241824.62162536496
+        hw_liq = enthalpy_mole[22]
+        hw_gas = enthalpy_mole[17]
 
         # 273 K
         # hw_liq = -287654.96084928664

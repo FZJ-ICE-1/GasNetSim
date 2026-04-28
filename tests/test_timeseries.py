@@ -21,7 +21,7 @@ from GasNetSim import (
     Node,
     Pipeline,
     Network,
-    GasMixture,
+    calculate_gas_mixture,
     validate_results_to_save,
     run_time_series,
     save_time_series_results,
@@ -35,7 +35,7 @@ class BaseTestNetwork(unittest.TestCase):
 
     def setUp(self):
         # Define gas mixture
-        gas_mixture = GasMixture(
+        gas_mixture = calculate_gas_mixture(
             composition=OrderedDict({"methane": 0.9, "hydrogen": 0.1}),
             temperature=300,
             pressure=50 * bar,

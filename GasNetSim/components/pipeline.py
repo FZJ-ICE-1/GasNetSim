@@ -539,7 +539,7 @@ class Resistance:
         :return: Mass flow rate [kg/s]
         """
         q = self.calc_flow_rate()
-        gas_rho = GasMixture(
+        gas_rho = calculate_gas_mixture(
             composition=self.gas_mixture.composition,
             pressure=STANDARD_PRESSURE,
             temperature=STANDARD_TEMPERATURE,
@@ -634,7 +634,7 @@ class LinearResistance:
         :return: Mass flow rate [kg/s]
         """
         q = self.calc_flow_rate()
-        gas_rho = GasMixture(
+        gas_rho = calculate_gas_mixture(
             composition=self.gas_mixture.composition,
             pressure=STANDARD_PRESSURE,
             temperature=STANDARD_TEMPERATURE,
@@ -714,7 +714,7 @@ class ShortPipe:
         :return: Mass flow rate [kg/s]
         """
         q = self.calc_flow_rate()
-        gas_rho = GasMixture(
+        gas_rho = calculate_gas_mixture(
             composition=self.gas_mixture.composition,
             pressure=STANDARD_PRESSURE,
             temperature=STANDARD_TEMPERATURE,

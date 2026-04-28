@@ -9,7 +9,7 @@
 from scipy.constants import bar
 
 from .gas_mixture.typical_mixture_composition import NATURAL_GAS_gri30
-from .gas_mixture.gas_mixture import GasMixture
+from .gas_mixture.gas_mixture import calculate_gas_mixture
 from ..utils.exception import InitializationError
 
 
@@ -74,14 +74,14 @@ class Node:
             self.flow_type = "volumetric"
 
         try:
-            self.gas_mixture = GasMixture(
+            self.gas_mixture = calculate_gas_mixture(
                 composition=self.gas_composition,
                 temperature=self.temperature,
                 pressure=self.pressure,
             )
         except (TypeError, AttributeError):
             # If pressure or temperature is missing for some nodes
-            self.gas_mixture = GasMixture(
+            self.gas_mixture = calculate_gas_mixture(
                 composition=self.gas_composition, temperature=288.15, pressure=50 * bar
             )
 
@@ -104,13 +104,17 @@ class Node:
 
     def update_gas_mixture(self):
         try:
-            self.gas_mixture = GasMixture(composition=self.get_mole_fraction(),
-                                          temperature=self.temperature,
-                                          pressure=self.pressure)
+            self.gas_mixture = calculate_gas_mixture(
+                composition=self.get_mole_fraction(),
+                temperature=self.temperature,
+                pressure=self.pressure,
+            )
         except (TypeError, AttributeError):
-            self.gas_mixture = GasMixture(composition=NATURAL_GAS_gri30,
-                                          temperature=288.15,
-                                          pressure=50 * bar)
+            self.gas_mixture = calculate_gas_mixture(
+                composition=NATURAL_GAS_gri30,
+                temperature=288.15,
+                pressure=50 * bar,
+            )
 
     def get_mole_fraction(self):
         """

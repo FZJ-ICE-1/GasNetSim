@@ -8,8 +8,10 @@
 #    *****************************************************************************
 from scipy.constants import bar
 
-from GasNetSim.components.gas_mixture.GERG2008 import *
-from GasNetSim.components.gas_mixture.GERG2008 import convert_to_gerg2008_composition
+from GasNetSim.components.gas_mixture.eos import *
+from GasNetSim.components.gas_mixture.eos import (
+    convert_to_gerg2008_composition,
+)
 from GasNetSim.components.gas_mixture.typical_mixture_composition import NATURAL_GAS
 
 # test over natural gas

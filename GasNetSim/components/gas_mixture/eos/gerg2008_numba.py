@@ -7,11 +7,14 @@
 #     Last change by yifei
 #    *****************************************************************************
 import math
+import json
+from collections import OrderedDict
+from dataclasses import dataclass
+from pathlib import Path
 from numba import njit, float64, types, int32, boolean
 from numba.extending import overload
 
 from .gerg2008_constants import *
-from .gerg2008 import number_of_atoms
 
 
 @njit(float64(float64), fastmath=True, cache=True, nogil=True)
@@ -424,35 +427,147 @@ def tTermsGERG_numba_sub(lntau, x):
     taupijk = np.zeros((MaxFlds, MaxTrmM))
 
     i = 4  # Use propane to get exponents for short form of EOS
-    for k in range(
-        int(kpol[i] + kexp[i])
-    ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+    for k in range(kpol[i] + kexp[i]):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
         taup0[k] = math.exp(toik[i][k] * lntau)
     for i in range(NcGERG):  # for (int i = 1; i <= NcGERG; ++i)
         if x[i] > epsilon:
             if (i > 3) and (i != 14) and (i != 17) and (i != 19):
-                for k in range(
-                    int(kpol[i] + kexp[i])
-                ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+                for k in range(kpol[i] + kexp[i]):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
                     taup[i][k] = noik[i][k] * taup0[k]
             else:
-                for k in range(
-                    int(kpol[i] + kexp[i])
-                ):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
+                for k in range(kpol[i] + kexp[i]):  # for (int k = 1; k <= kpol[i] + kexp[i]; ++k)
                     taup[i][k] = noik[i][k] * math.exp(toik[i][k] * lntau)
 
     for i in range(NcGERG):  # for (int i = 1; i <= NcGERG - 1; ++i)
         if x[i] > epsilon:
             for j in range(i + 1, NcGERG):  # for (int j = i + 1; j <= NcGERG; ++j)
                 if x[j] > epsilon:
-                    mn = int(mNumb[i][j] - 1)
+                    mn = mNumb[i][j] - 1
                     if mn >= 0:
-                        for k in range(
-                            int(kpolij[mn])
-                        ):  # for (int k = 1; k <= kpolij[mn]; ++k)
+                        for k in range(kpolij[mn]):  # for (int k = 1; k <= kpolij[mn]; ++k)
                             taupijk[mn][k] = nijk[mn][k] * math.exp(tijk[mn][k] * lntau)
 
     return taup, taupijk
+
+
+@njit(
+    float64[:, :](
+        float64, float64, float64[:, :], float64[:, :],
+        float64, float64[:], int32, float64,
+    ),
+    fastmath=True, cache=True, nogil=True,
+)
+def _AlpharGERG_core_numba(Tr, Dr, taup, taupijk, D, x, itau, lntau):
+    """
+    Core of AlpharGERG that only depends on delta = D/Dr.
+
+    Tr, Dr, taup, taupijk, and lntau are composition/temperature-only and must
+    be precomputed by the caller via ReducingParametersGERG_numba and
+    tTermsGERG_numba. This split exists so DensityGERG_numba's Newton loop
+    doesn't redo those O(N^2) terms on every iteration.
+
+    Behavior matches AlpharGERG_numba exactly when given the same precomputed
+    inputs; see that function for the meaning of the returned ar array.
+    """
+    delp = np.zeros(7, dtype=np.float64)
+    Expd = np.zeros(7, dtype=np.float64)
+    ar = np.zeros((4, 4), dtype=np.float64)
+    delta = D / Dr
+    delp[0] = delta
+    Expd[0] = math.exp(-delp[0])
+    for i in range(1, 7):
+        delp[i] = delp[i - 1] * delta
+        Expd[i] = math.exp(-delp[i])
+
+    # Calculate pure fluid contributions
+    for i in range(NcGERG):
+        if x[i] > epsilon:
+            for k in range(kpol[i]):
+                ndt = x[i] * delp[doik[i][k] - 1] * taup[i][k]
+                ndtd = ndt * doik[i][k]
+                ar[0][1] += ndtd
+                ar[0][2] += ndtd * (doik[i][k] - 1)
+                if itau > 0:
+                    ndtt = ndt * toik[i][k]
+                    ar[0][0] += ndt
+                    ar[1][0] += ndtt
+                    ar[2][0] += ndtt * (toik[i][k] - 1)
+                    ar[1][1] += ndtt * doik[i][k]
+                    ar[1][2] += ndtt * doik[i][k] * (doik[i][k] - 1)
+                    ar[0][3] += ndtd * (doik[i][k] - 1) * (doik[i][k] - 2)
+
+            for k in range(kpol[i], kpol[i] + kexp[i]):
+                ndt = (
+                    x[i]
+                    * delp[doik[i][k] - 1]
+                    * taup[i][k]
+                    * Expd[coik[i][k] - 1]
+                )
+                ex = coik[i][k] * delp[coik[i][k] - 1]
+                ex2 = doik[i][k] - ex
+                ex3 = ex2 * (ex2 - 1)
+                ar[0][1] += ndt * ex2
+                ar[0][2] += ndt * (ex3 - coik[i][k] * ex)
+                if itau > 0:
+                    ndtt = ndt * toik[i][k]
+                    ar[0][0] += ndt
+                    ar[1][0] += ndtt
+                    ar[2][0] += ndtt * (toik[i][k] - 1)
+                    ar[1][1] += ndtt * ex2
+                    ar[1][2] += ndtt * (ex3 - coik[i][k] * ex)
+                    ar[0][3] += ndt * (
+                        ex3 * (ex2 - 2) - ex * (3 * ex2 - 3 + coik[i][k]) * coik[i][k]
+                    )
+
+    # Calculate mixture contributions
+    for i in range(NcGERG - 1):
+        if x[i] > epsilon:
+            for j in range(i + 1, NcGERG):
+                if x[j] > epsilon:
+                    mn = mNumb[i][j] - 1
+                    if mn >= 0:
+                        xijf = x[i] * x[j] * fij[i][j]
+                        for k in range(kpolij[mn]):
+                            ndt = xijf * delp[dijk[mn][k] - 1] * taupijk[mn][k]
+                            ndtd = ndt * dijk[mn][k]
+                            ar[0][1] += ndtd
+                            ar[0][2] += ndtd * (dijk[mn][k] - 1)
+                            if itau > 0:
+                                ndtt = ndt * tijk[mn][k]
+                                ar[0][0] += ndt
+                                ar[1][0] += ndtt
+                                ar[2][0] += ndtt * (tijk[mn][k] - 1)
+                                ar[1][1] += ndtt * dijk[mn][k]
+                                ar[1][2] += ndtt * dijk[mn][k] * (dijk[mn][k] - 1)
+                                ar[0][3] += ndtd * (dijk[mn][k] - 1) * (dijk[mn][k] - 2)
+
+                        for k in range(kpolij[mn], kpolij[mn] + kexpij[mn]):
+                            cij0 = cijk[mn][k] * delp[1]
+                            eij0 = eijk[mn][k] * delta
+                            ndt = (
+                                xijf
+                                * nijk[mn][k]
+                                * delp[dijk[mn][k] - 1]
+                                * math.exp(
+                                    cij0 + eij0 + gijk[mn][k] + tijk[mn][k] * lntau
+                                )
+                            )
+                            ex = dijk[mn][k] + 2 * cij0 + eij0
+                            ex2 = ex * ex - dijk[mn][k] + 2 * cij0
+                            ar[0][1] += ndt * ex
+                            ar[0][2] += ndt * ex2
+                            if itau > 0:
+                                ndtt = ndt * tijk[mn][k]
+                                ar[0][0] += ndt
+                                ar[1][0] += ndtt
+                                ar[2][0] += ndtt * (tijk[mn][k] - 1)
+                                ar[1][1] += ndtt * ex
+                                ar[1][2] += ndtt * ex2
+                                ar[0][3] += ndt * (
+                                    ex * (ex2 - 2 * (dijk[mn][k] - 2 * cij0))
+                                    + 2 * dijk[mn][k]
+                                )
+    return ar
 
 
 # @overload(AlpharGERG_numba)
@@ -510,8 +625,8 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
     # Calculate pure fluid contributions
     for i in range(NcGERG):
         if x[i] > epsilon:
-            for k in range(int(kpol[i])):
-                ndt = x[i] * delp[int(doik[i][k] - 1)] * taup[i][k]
+            for k in range(kpol[i]):
+                ndt = x[i] * delp[doik[i][k] - 1] * taup[i][k]
                 ndtd = ndt * doik[i][k]
                 ar[0][1] += ndtd
                 ar[0][2] += ndtd * (doik[i][k] - 1)
@@ -524,14 +639,14 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
                     ar[1][2] += ndtt * doik[i][k] * (doik[i][k] - 1)
                     ar[0][3] += ndtd * (doik[i][k] - 1) * (doik[i][k] - 2)
 
-            for k in range(int(kpol[i]), int(kpol[i] + kexp[i])):
+            for k in range(kpol[i], kpol[i] + kexp[i]):
                 ndt = (
                     x[i]
-                    * delp[int(doik[i][k] - 1)]
+                    * delp[doik[i][k] - 1]
                     * taup[i][k]
-                    * Expd[int(coik[i][k] - 1)]
+                    * Expd[coik[i][k] - 1]
                 )
-                ex = coik[i][k] * delp[int(coik[i][k] - 1)]
+                ex = coik[i][k] * delp[coik[i][k] - 1]
                 ex2 = doik[i][k] - ex
                 ex3 = ex2 * (ex2 - 1)
                 ar[0][1] += ndt * ex2
@@ -552,13 +667,11 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
         if x[i] > epsilon:
             for j in range(i + 1, NcGERG):  # for (int j = i + 1; j <= NcGERG; ++j)
                 if x[j] > epsilon:
-                    mn = int(mNumb[i][j] - 1)
+                    mn = mNumb[i][j] - 1
                     if mn >= 0:
                         xijf = x[i] * x[j] * fij[i][j]
-                        for k in range(
-                            int(kpolij[mn])
-                        ):  # for (int k = 1; k <= kpolij[mn]; ++k)
-                            ndt = xijf * delp[int(dijk[mn][k] - 1)] * taupijk[mn][k]
+                        for k in range(kpolij[mn]):  # for (int k = 1; k <= kpolij[mn]; ++k)
+                            ndt = xijf * delp[dijk[mn][k] - 1] * taupijk[mn][k]
                             ndtd = ndt * dijk[mn][k]
                             ar[0][1] += ndtd
                             ar[0][2] += ndtd * (dijk[mn][k] - 1)
@@ -572,14 +685,14 @@ def AlpharGERG_numba(T, x, itau, idelta, D):
                                 ar[0][3] += ndtd * (dijk[mn][k] - 1) * (dijk[mn][k] - 2)
 
                         for k in range(
-                            int(kpolij[mn]), int(kpolij[mn] + kexpij[mn])
+                            kpolij[mn], kpolij[mn] + kexpij[mn]
                         ):  # for (int k = 1 + kpolij[mn]; k <= kpolij[mn] + kexpij[mn]; ++k)
                             cij0 = cijk[mn][k] * delp[1]
                             eij0 = eijk[mn][k] * delta
                             ndt = (
                                 xijf
                                 * nijk[mn][k]
-                                * delp[int(dijk[mn][k] - 1)]
+                                * delp[dijk[mn][k] - 1]
                                 * math.exp(
                                     cij0 + eij0 + gijk[mn][k] + tijk[mn][k] * lntau
                                 )
@@ -767,6 +880,115 @@ def DensityGERG_numba(P, T, x, iFlag=0):
 
 # def AlpharGERG_numba(T, x, itau, idelta, D):
 #     pass
+
+
+@njit(cache=True, nogil=True)
+def DensityGERG_fast_numba(P, T, x, iFlag=0):
+    """
+    Drop-in replacement for DensityGERG_numba that hoists composition- and
+    temperature-only terms (Tr, Dr, taup, taupijk, lntau) out of the Newton
+    loop. Only delta = D/Dr changes between iterations, so those O(N^2) terms
+    are computed once here instead of ~6-10 times inside PressureGERG_numba
+    -> AlpharGERG_numba. Same inputs, same return tuple (ierr, herr, D).
+
+    See DensityGERG_numba for argument documentation.
+    """
+
+    D = 0  # initial estimate of the density
+
+    dPdD = 0.0
+    d2PdTD = 0.0
+    Cv = 0.0
+    Cp = 0.0
+    W = 0.0
+    PP = 0.0
+
+    ierr = 0
+    herr = ""
+    nFail = 0
+    iFail = 0
+    if P < epsilon:
+        D = 0
+        return ierr, herr, D
+    tolr = 0.0000001
+    Tcx, Dcx = PseudoCriticalPointGERG_numba(x)
+
+    if D > -epsilon:
+        D = P / RGERG / T  # Ideal gas estimate for vapor phase
+        if iFlag == 2:
+            D = Dcx * 3  # Initial estimate for liquid phase
+
+    else:
+        D = abs(D)  # If D<0, then use as initial estimate
+
+    # Composition- and temperature-only precomputes, hoisted out of the loop.
+    Tr, Dr = ReducingParametersGERG_numba(x)
+    lntau = math.log(Tr / T)
+    taup, taupijk = tTermsGERG_numba(lntau, x)
+    RT = RGERG * T
+
+    plog = math.log(P)
+    vlog = -math.log(D)
+    for it in range(1, 51):
+        if (
+            (vlog < -7)
+            or (vlog > 100)
+            or (it == 20)
+            or (it == 30)
+            or (it == 40)
+            or (iFail == 1)
+        ):
+            iFail = 0
+            if nFail > 2:
+                ierr = 1
+                herr = "Calculation failed to converge in GERG method, ideal gas density returned."
+                D = P / RGERG / T
+            nFail += 1
+            if nFail == 1:
+                D = Dcx * 3
+            elif nFail == 2:
+                D = Dcx * 2.5
+            elif nFail == 3:
+                D = Dcx * 2
+
+            vlog = -math.log(D)
+        D = math.exp(-vlog)
+        ar_core = _AlpharGERG_core_numba(Tr, Dr, taup, taupijk, D, x, 0, lntau)
+        Z = 1 + ar_core[0][1]
+        P2 = D * RT * Z
+        dPdDsave = RT * (1 + 2 * ar_core[0][1] + ar_core[0][2])
+        if (dPdDsave < epsilon) or (P2 < epsilon):
+            vinc = 0.1
+            if D > Dcx:
+                vinc = -0.1
+            if it > 5:
+                vinc = vinc / 2
+            if (it > 10) and (it < 20):
+                vinc = vinc / 5
+            vlog += vinc
+        else:
+            dpdlv = -D * dPdDsave
+            vdiff = (math.log(P2) - plog) * P2 / dpdlv
+            vlog += -vdiff
+            if abs(vdiff) < tolr:
+                if dPdDsave < 0:
+                    iFail = 1
+                else:
+                    D = math.exp(-vlog)
+
+                    if iFlag > 0:
+                        if ((PP <= 0) or (dPdD <= 0) or (d2PdTD <= 0)) or (
+                            (Cv <= 0) or (Cp <= 0) or (W <= 0)
+                        ):
+                            ierr = 1
+                            herr = "Calculation failed to converge in GERG method, ideal gas density returned."
+                            D = P / RGERG / T
+                        return ierr, herr, D
+                    return ierr, herr, D
+    ierr = 1
+    herr = "Calculation failed to converge in GERG method, ideal gas density returned."
+    D = P / RGERG / T
+    return ierr, herr, D
 
 
 @njit(types.UniTuple(float64, 20)(float64, float64, float64[:]), cache=True, nogil=True)
@@ -1005,3 +1227,117 @@ def specific_gas_constant_numba(x):
     R = RGERG
     molar_mass = molar_mass_numba(x)
     return R / molar_mass
+
+
+def convert_to_gerg2008_composition(composition: OrderedDict) -> np.ndarray:
+    gerg_composition = np.zeros(21)
+    for gas_spice, mol_frac in composition.items():
+        gerg_composition[np.where(gerg_gas_spices == gas_spice)] = mol_frac
+    return np.array(gerg_composition)
+
+
+def convert_gerg2008_to_dictionary(gerg2008_composition: np.ndarray) -> OrderedDict:
+    assert gerg2008_composition.shape == (21,), "Check the GERG-2008 composition array"
+    gas_mixture_composition = OrderedDict()
+    for _i in range(21):
+        if gerg2008_composition[_i] > 0:
+            gas_mixture_composition[gerg_gas_spices[_i]] = gerg2008_composition[_i]
+    return gas_mixture_composition
+
+
+@dataclass(eq=False)
+class GERG2008Properties:
+    P: float
+    T: float
+    x: np.ndarray
+    MolarMass: float
+    MolarDensity: float
+    rho: float
+    SG: float
+    Z: float
+    dPdD: float
+    d2PdD2: float
+    dPdT: float
+    energy: float
+    enthalpy: float
+    entropy: float
+    Cv_molar: float
+    Cp_molar: float
+    Cp: float
+    Cv: float
+    c: float
+    gibbs_energy: float
+    JT: float
+    isentropic_exponent: float
+    R_specific: float
+
+
+def calculate_gerg2008_properties(
+    P_Pa: float,
+    T_K: float,
+    composition: np.ndarray,
+) -> GERG2008Properties:
+    pressure_kpa = P_Pa / 1000.0
+    temperature_k = T_K
+    composition_array = np.array(composition, dtype=float, copy=True)
+
+    properties = PropertiesGERG_numba(T=temperature_k, P=pressure_kpa, x=composition_array)
+    molar_mass = properties[0]
+    molar_density = properties[1]
+    rho = properties[17]
+    sg = properties[18]
+    z_factor = properties[2]
+    dPdD = properties[3]
+    d2PdD2 = properties[4]
+    dPdT = properties[5]
+    energy = properties[6]
+    enthalpy = properties[7]
+    entropy = properties[8]
+    cv_molar = properties[9]
+    cp_molar = properties[10]
+    cv = properties[11]
+    cp = properties[12]
+    speed_of_sound = properties[13]
+    gibbs_energy = properties[14]
+    jt = properties[15]
+    isentropic_exponent = properties[16]
+    r_specific = properties[19]
+
+    return GERG2008Properties(
+        P=pressure_kpa,
+        T=temperature_k,
+        x=composition_array,
+        MolarMass=molar_mass,
+        MolarDensity=molar_density,
+        rho=rho,
+        SG=sg,
+        Z=z_factor,
+        dPdD=dPdD,
+        d2PdD2=d2PdD2,
+        dPdT=dPdT,
+        energy=energy,
+        enthalpy=enthalpy,
+        entropy=entropy,
+        Cv_molar=cv_molar,
+        Cp_molar=cp_molar,
+        Cp=cp,
+        Cv=cv,
+        c=speed_of_sound,
+        gibbs_energy=gibbs_energy,
+        JT=jt,
+        isentropic_exponent=isentropic_exponent,
+        R_specific=r_specific,
+    )
+
+
+def GasMixtureGERG2008(
+    P_Pa: float,
+    T_K: float,
+    composition: np.ndarray,
+) -> GERG2008Properties:
+    """Legacy compatibility wrapper for callers that still use the old constructor name."""
+    return calculate_gerg2008_properties(
+        P_Pa=P_Pa,
+        T_K=T_K,
+        composition=composition,
+    )

@@ -62,9 +62,9 @@ if __name__ == "__main__":
     from scipy.constants import bar
 
     # from GasNetSim.components.utils.gas_mixture.thermo.thermo import Mixture
-    from GasNetSim.components.gas_mixture import GasMixture
+    from GasNetSim.components.gas_mixture import calculate_gas_mixture
 
-    gas_mixture = GasMixture(
+    gas_mixture = calculate_gas_mixture(
         temperature=300,
         pressure=50 * bar,
         composition={"methane": 0.9, "hydrogen": 0.1},

@@ -7,164 +7,169 @@
 #     Last change by yifei
 #    *****************************************************************************
 from collections import OrderedDict
-import logging
+from dataclasses import dataclass
+from typing import Mapping, Union
+
+import numpy as np
 from scipy.constants import atm, zero_Celsius
 
-# from .thermo.thermo import Mixture
-# from thermo import Mixture
-from .GERG2008.gerg2008 import *
-from .GERG2008.gerg2008_constants import *
-from .GERG2008.gerg2008 import convert_to_gerg2008_composition
-from .viscosity import calculate_viscosity
-from .viscosity import ViscosityMethod
+from .eos import (
+    calculate_gerg2008_properties,
+    convert_gerg2008_to_dictionary,
+    convert_to_gerg2008_composition,
+)
+from .thermochemistry import CalculateHeatingValuesMolar_numba
+from .viscosity import ViscosityMethod, calculate_viscosity
 
 
-# from .heating_value import calc_heating_value
+CompositionInput = Union[Mapping[str, float], np.ndarray]
 
 
+@dataclass(eq=False)
 class GasMixture:
+    """Calculated gas mixture properties."""
+
+    pressure: float
+    temperature: float
+    composition: OrderedDict
+    eos_composition: np.ndarray
+    method: str = "GERG-2008"
+    viscosity_method: str = "Herning-Zipperer"
+    compressibility: float = None
+    specific_gravity: float = None
+    molar_mass: float = None
+    density: float = None
+    standard_density: float = None
+    joule_thomson_coefficient: float = None
+    viscosity: float = None
+    heat_capacity_constant_pressure: float = None
+    R_specific: float = None
+    HHV_J_per_m3: float = None
+    HHV_J_per_sm3: float = None
+    HHV_J_per_kg: float = None
+    LHV_J_per_m3: float = None
+    LHV_J_per_sm3: float = None
+    LHV_J_per_kg: float = None
+    Z: float = None
+    SG: float = None
+    MolarMass: float = None
+    rho: float = None
+    JT: float = None
+    Cp: float = None
+    Cv: float = None
+
+
+def calculate_gas_mixture(
+    pressure: float,
+    temperature: float,
+    composition: CompositionInput,
+    method: str = "GERG-2008",
+    viscosity_method: str = "Herning-Zipperer",
+    T_ref_dens_degreeC: float = 0.0,
+    T_ref_comb_degreeC: float = 25.0,
+) -> GasMixture:
     """
-    Class for gas mixture properties
+    Calculate EOS-backed gas mixture properties.
+
+    Args:
+        pressure: Gas pressure [Pa].
+        temperature: Gas temperature [K].
+        composition: Component mole fractions as a dictionary or GERG-2008 array.
+        method: EOS method. Currently only GERG-2008 is supported.
+        viscosity_method: Viscosity calculation method.
+        T_ref_dens_degreeC: Reference temperature for standard density and volume conversions [degC].
+        T_ref_comb_degreeC: Reference temperature for heating value calculation [degC].
     """
+    if method != "GERG-2008":
+        raise NotImplementedError(f"Gas mixture method {method!r} is not supported.")
 
-    def __init__(
-        self, pressure, temperature, composition: OrderedDict, method="GERG-2008", viscosity_method="Herning-Zipperer"
-    ):
-        """
+    eos_composition, composition_dict = _prepare_gerg2008_composition(composition)
+    eos_mixture = calculate_gerg2008_properties(
+        P_Pa=pressure,
+        T_K=temperature,
+        composition=eos_composition,
+    )
 
-        :param pressure:
-        :param temperature:
-        :param composition:
-        :param method:
-        """
-        self.pressure = pressure
-        self.temperature = temperature
-        self.composition = composition
-        self.method = method
-        self.viscosity_method = viscosity_method
-        self.convert_composition_format()
-        self.update_gas_mixture()
+    viscosity = calculate_viscosity(
+        temperature,
+        pressure,
+        eos_composition,
+        _viscosity_method(viscosity_method),
+    )
+    lhv_molar, hhv_molar = CalculateHeatingValuesMolar_numba(
+        eos_composition,
+        reference_temp=T_ref_comb_degreeC,
+    )
+    ref_temp_props_K = T_ref_dens_degreeC + zero_Celsius
+    heating_value_sm3_factor = (
+        1.0
+        / eos_mixture.P
+        / 1000.0
+        * atm
+        / ref_temp_props_K
+        * eos_mixture.T
+        * eos_mixture.Z
+    )
+    standard_density = (
+        eos_mixture.rho
+        * eos_mixture.T
+        / eos_mixture.P
+        / 1e3
+        * atm
+        / ref_temp_props_K
+        * eos_mixture.Z
+    )
+    hhv_j_per_m3 = hhv_molar * eos_mixture.MolarDensity * 1e3
+    lhv_j_per_m3 = lhv_molar * eos_mixture.MolarDensity * 1e3
 
-    def convert_composition_format(self):
-        if self.method == "GERG-2008":
-            self.eos_composition = convert_to_gerg2008_composition(self.composition)
-            self.eos_composition_tmp = convert_to_gerg2008_composition(self.composition)
-        elif self.method == "PREOS":
-            self.eos_composition = self.composition
-            self.eos_composition_tmp = self.composition
+    return GasMixture(
+        pressure=pressure,
+        temperature=temperature,
+        composition=composition_dict,
+        eos_composition=eos_composition,
+        method=method,
+        viscosity_method=viscosity_method,
+        compressibility=eos_mixture.Z,
+        specific_gravity=eos_mixture.SG,
+        molar_mass=eos_mixture.MolarMass,
+        density=eos_mixture.rho,
+        standard_density=standard_density,
+        joule_thomson_coefficient=eos_mixture.JT,
+        viscosity=viscosity,
+        heat_capacity_constant_pressure=eos_mixture.Cp,
+        R_specific=eos_mixture.R_specific,
+        HHV_J_per_m3=hhv_j_per_m3,
+        HHV_J_per_sm3=hhv_j_per_m3 * heating_value_sm3_factor,
+        HHV_J_per_kg=hhv_molar / eos_mixture.MolarMass * 1e3,
+        LHV_J_per_m3=lhv_j_per_m3,
+        LHV_J_per_sm3=lhv_j_per_m3 * heating_value_sm3_factor,
+        LHV_J_per_kg=lhv_molar / eos_mixture.MolarMass * 1e3,
+        Z=eos_mixture.Z,
+        SG=eos_mixture.SG,
+        MolarMass=eos_mixture.MolarMass,
+        rho=eos_mixture.rho,
+        JT=eos_mixture.JT,
+        Cp=eos_mixture.Cp,
+        Cv=eos_mixture.Cv,
+    )
 
-    def convert_eos_composition_to_dictionary(self):
-        if self.method == "GERG-2008":
-            self.composition = convert_gerg2008_to_dictionary(self.eos_composition)
-        return None
 
-    def update_gas_mixture(self):
-        if self.method == "GERG-2008":
-            self.gerg2008_mixture = GasMixtureGERG2008(
-                P_Pa=self.pressure,
-                T_K=self.temperature,
-                composition=self.eos_composition_tmp,
-            )
-        elif self.method == "PREOS":
-            self.thermo_mixture = Mixture(
-                P=self.pressure, T=self.temperature, zs=self.eos_composition_tmp
-            )
+def _prepare_gerg2008_composition(
+    composition: CompositionInput,
+) -> tuple[np.ndarray, OrderedDict]:
+    if isinstance(composition, np.ndarray):
+        eos_composition = np.array(composition, dtype=float, copy=True)
+        composition_dict = convert_gerg2008_to_dictionary(eos_composition)
+    else:
+        composition_dict = OrderedDict(composition)
+        eos_composition = convert_to_gerg2008_composition(composition_dict)
 
-    @property
-    def compressibility(self):
-        if self.method == "PREOS":
-            if self.thermo_mixture.Z is not None:
-                z = self.thermo_mixture.Z
-            else:
-                logging.warning(
-                    "Compressibility is not available, using the Z for gas!"
-                )
-                z = self.thermo_mixture.Zg
-            return self.thermo_mixture.Z
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.Z
+    return eos_composition, composition_dict
 
-    @property
-    def specific_gravity(self):
-        if self.method == "PREOS":
-            if self.thermo_mixture.SG is not None:
-                specific_gravity = self.thermo_mixture.SG
-            else:
-                logging.warning(
-                    "Specific gravity is not available, using the SG for gas!"
-                )
-                specific_gravity = self.thermo_mixture.SGg
-            return specific_gravity
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.SG
 
-    @property
-    def molar_mass(self):
-        if self.method == "PREOS":
-            return self.thermo_mixture.MW
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.MolarMass
-
-    @property
-    def density(self):
-        if self.method == "PREOS":
-            return self.thermo_mixture.rho
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.rho
-
-    @property
-    def standard_density(self):
-        if self.method == "PREOS":
-            return Mixture(P=1 * atm, T=15 + zero_Celsius, zs=self.composition).rho
-
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.standard_density
-
-    @property
-    def joule_thomson_coefficient(self):
-        if self.method == "PREOS":
-            return self.thermo_mixture.JT
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.JT
-
-    @property
-    def viscosity(self):
-        if self.viscosity_method == "Herning-Zipperer":
-            return calculate_viscosity(self.temperature, self.pressure, self.eos_composition, ViscosityMethod.HERNING_ZIPPERER)
-        elif self.viscosity_method == "Lucas":
-            return calculate_viscosity(self.temperature, self.pressure, self.eos_composition, ViscosityMethod.LUCAS)
-
-    @property
-    def heat_capacity_constant_pressure(self):
-        if self.method == "PREOS":
-            return self.thermo_mixture.Cp
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.Cp
-
-    @property
-    def R_specific(self):
-        if self.method == "PREOS":
-            return self.thermo_mixture.R_specific
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.R_specific
-
-    @property
-    def HHV_J_per_m3(self):
-        if self.method == "PREOS":
-            return None
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.HHV_J_per_m3
-
-    @property
-    def HHV_J_per_sm3(self):
-        if self.method == "PREOS":
-            return None
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.HHV_J_per_sm3
-
-    @property
-    def HHV_J_per_kg(self):
-        if self.method == "PREOS":
-            return None
-        elif self.method == "GERG-2008":
-            return self.gerg2008_mixture.HHV_J_per_kg
+def _viscosity_method(method: str) -> ViscosityMethod:
+    if method == "Herning-Zipperer":
+        return ViscosityMethod.HERNING_ZIPPERER
+    if method == "Lucas":
+        return ViscosityMethod.LUCAS
+    raise ValueError(f"Unsupported viscosity calculation method: {method}")
