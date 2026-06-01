@@ -520,6 +520,36 @@ class Network:
                     #     pressure_init[i] = pressure_init[j] / (1 - 0.05 * (res/max_resistance) * (flow /max_flow))
                     # pressure_init[i] = pressure_init[j] / 0.98
 
+            # Propagate initial pressures across compressors using the
+            # compression ratio so nodes only reachable through a compressor
+            # chain still get seeded. Without this, pressure_init stays None
+            # downstream of any series-compressor and the solver raises
+            # NoneType / float in the first Newton step.
+            if self.compressors is not None:
+                for compressor in self.compressors.values():
+                    i = self.node_id_to_simulation_node_index(compressor.inlet_index)
+                    j = self.node_id_to_simulation_node_index(compressor.outlet_index)
+                    ratio = compressor.compression_ratio
+                    if pressure_init[i] is None and pressure_init[j] is None:
+                        continue
+                    if pressure_init[j] is None:
+                        pressure_init[j] = pressure_init[i] * ratio
+                    elif pressure_init[i] is None:
+                        pressure_init[i] = pressure_init[j] / ratio
+
+        # Add per-node jitter to break degenerate flat sections (adjacent
+        # zero-flow junctions seeded at identical pressure because the
+        # propagation formula reduces to identity, which makes Weymouth's
+        # (p1**2 - p2**2)**(-0.5) singular on the first Newton step).
+        for sim_idx in range(len(pressure_init)):
+            if pressure_init[sim_idx] is None:
+                continue
+            node_id = self.simulation_node_index_to_node_id(sim_idx)
+            if self.nodes[node_id].pressure is not None:
+                continue  # don't perturb reference / pressure-set nodes
+            jitter = ((int(node_id) % 11) - 5) * 1000.0
+            pressure_init[sim_idx] = pressure_init[sim_idx] + jitter
+
         return pressure_init
 
     def newton_raphson_initialization(self):
@@ -604,6 +634,23 @@ class Network:
         return nodal_flow_init, pressure_init, temperature_init
 
     def jacobian_matrix(self, use_cuda=False, sparse_matrix=False):
+        """Build the augmented Newton system.
+
+        Variables (in order):
+          - nodal pressures at every node (n_nodes entries)
+          - compressor flow rate Q_c per compressor (n_compressors entries)
+
+        Equations:
+          - flow balance at every node (n_nodes entries), restricted later to
+            junction nodes by deleting non-junction rows
+          - pressure-ratio constraint per compressor: P_outlet - r*P_inlet = 0
+            (n_compressors entries, appended after the node rows)
+
+        Treating Q_c as a Newton variable and the pressure ratio as an
+        equation (rather than a post-step projection) avoids the
+        compounding-projection failure mode that breaks convergence when
+        many compressors are present.
+        """
 
         connections = self.connections
         nodes = self.nodes
@@ -611,11 +658,16 @@ class Network:
         non_junction_nodes_sim_indices = [self.node_id_to_simulation_node_index(x) for x in self.non_junction_nodes]
 
         n_nodes = self.get_simulation_node_count()
-
-        n_junction_nodes = len(self.junction_nodes)
+        compressor_list = list(self.compressors.values()) if self.compressors is not None else []
+        n_compressors = len(compressor_list)
+        compressor_col = {
+            comp.compressor_index: n_nodes + k
+            for k, comp in enumerate(compressor_list)
+        }
+        n_aug = n_nodes + n_compressors
 
         jacobian_mat = create_matrix_of_zeros(
-            n_nodes, use_cuda=use_cuda, sparse_matrix=sparse_matrix
+            n_aug, use_cuda=use_cuda, sparse_matrix=sparse_matrix
         )
         flow_mat = create_matrix_of_zeros(
             n_nodes, use_cuda=use_cuda, sparse_matrix=sparse_matrix
@@ -626,46 +678,63 @@ class Network:
             j = self.node_id_to_simulation_node_index(connection.outlet_index)
 
             connection.calculate_stable_flow_rate()
+            flow_value = connection.flow_rate if connection.flow_rate is not None else 0
 
-            flow_mat[i][j] -= connection.flow_rate
-            flow_mat[j][i] += connection.flow_rate
+            flow_mat[i][j] -= flow_value
+            flow_mat[j][i] += flow_value
 
-            if type(connection) is not ShortPipe:
-                if type(connection) is Compressor:
-                    # Use the proper derivatives from compressor class
-                    total_flow_in, total_derivative_in, total_flow_out, total_derivative_out = connection.calculate_incoming_flows_and_derivatives(
-                        self.pipelines.values()
+            if type(connection) is ShortPipe:
+                continue
+
+            if type(connection) is Compressor:
+                # Augmented handling: Q_c is a Newton variable, constraint
+                # P_outlet - r*P_inlet = 0 lives in its own row.
+                col = compressor_col[connection.compressor_index]
+                r = connection.compression_ratio
+
+                # Flow-balance contribution of Q_c:
+                #   nodal_flow[i] -= Q_c (outflow at compressor inlet)
+                #   nodal_flow[j] += Q_c (inflow at compressor outlet)
+                # In the convention J @ delta_x = delta_flow with
+                #   delta_flow = f_target - nodal_flow:
+                #   d(nodal_flow[i])/dQ_c = -1, so the +1 contribution to
+                #   nodal_flow[j] and -1 contribution to nodal_flow[i]
+                #   appear as +1 and -1 in J's compressor column.
+                jacobian_mat[i][col] += -1
+                jacobian_mat[j][col] += +1
+
+                # Constraint row at index col:
+                #   F[col] = P_outlet - r*P_inlet, want = 0.
+                #   dF[col]/dP_inlet = -r, dF[col]/dP_outlet = +1.
+                # Same convention J @ delta_x = -F = r*P_inlet - P_outlet:
+                jacobian_mat[col][i] += -r
+                jacobian_mat[col][j] += +1
+            else:
+                # Standard pipeline/resistance handling
+                slope_corr = connection.calc_pipe_slope_correction()
+                p1 = connection.inlet.pressure
+                p2 = connection.outlet.pressure
+                tmp = (abs(p1**2 - p2**2 - slope_corr)) ** (-0.5)
+
+                if i not in non_junction_nodes_sim_indices and j not in non_junction_nodes_sim_indices:
+                    jacobian_mat[i][j] += connection.flow_rate_first_order_derivative(
+                        is_inlet=False
                     )
-        
-                    jacobian_mat[i][i] += total_derivative_in
-                    jacobian_mat[j][j] += total_derivative_out
-                    jacobian_mat[i][j] -= total_derivative_in
-                    jacobian_mat[j][i] -= total_derivative_out
-                else:
-                    # Standard pipeline/resistance handling
-                    slope_corr = connection.calc_pipe_slope_correction()
-                    p1 = connection.inlet.pressure
-                    p2 = connection.outlet.pressure
-                    tmp = (abs(p1**2 - p2**2 - slope_corr)) ** (-0.5)
+                    jacobian_mat[j][i] += connection.flow_rate_first_order_derivative(
+                        is_inlet=True
+                    )
+                if i not in non_junction_nodes_sim_indices:
+                    jacobian_mat[i][i] += -connection.flow_rate_first_order_derivative(
+                        is_inlet=True
+                    )
+                if j not in non_junction_nodes_sim_indices:
+                    jacobian_mat[j][j] += -connection.flow_rate_first_order_derivative(
+                        is_inlet=False
+                    )
 
-                    if i not in non_junction_nodes_sim_indices and j not in non_junction_nodes_sim_indices:
-                        jacobian_mat[i][j] += connection.flow_rate_first_order_derivative(
-                            is_inlet=False
-                        )
-                        jacobian_mat[j][i] += connection.flow_rate_first_order_derivative(
-                            is_inlet=True
-                        )
-                    if i not in non_junction_nodes_sim_indices:
-                        jacobian_mat[i][i] += -connection.flow_rate_first_order_derivative(
-                            is_inlet=True
-                        )
-                    if j not in non_junction_nodes_sim_indices:
-                        jacobian_mat[j][j] += -connection.flow_rate_first_order_derivative(
-                            is_inlet=False
-                        )
-
+        # Delete only NON-JUNCTION NODE rows/cols (indices < n_nodes).
+        # Compressor rows/cols (indices >= n_nodes) survive unchanged.
         jacobian_mat = delete_matrix_rows_and_columns(jacobian_mat, non_junction_nodes_sim_indices)
-        # flow_mat = delete_matrix_rows_and_columns(flow_mat, non_junction_nodes_dense)
 
         return jacobian_mat, flow_mat
 
@@ -766,26 +835,30 @@ class Network:
             r.update_gas_mixture()
 
     def update_compressor_parameters(self):
-        """Update compressor parameters and calculate flow rates."""
-        if self.compressors is not None:
-            for index, compressor in self.compressors.items():
-                compressor.inlet = self.nodes[compressor.inlet_index]
-                compressor.outlet = self.nodes[compressor.outlet_index]
-                compressor.update_gas_mixture()
-                
-                # Calculate compressor flow rates from connected pipelines
-                if self.pipelines is not None:
-                    total_flow_in, total_derivative_in, total_flow_out, total_derivative_out = \
-                        compressor.calculate_incoming_flows_and_derivatives(self.pipelines.values())
-                    
-                    # Fix sign convention: node demands should be positive for consumption
-                    inlet_node_demand = compressor.inlet.volumetric_flow if compressor.inlet.volumetric_flow is not None else 0.0
-                    outlet_node_demand = compressor.outlet.volumetric_flow if compressor.outlet.volumetric_flow is not None else 0.0
-                    
-                    compressor.update_flow_rate(total_flow_in, total_flow_out, inlet_node_demand, outlet_node_demand)
-                    
-                    # Enforce compressor pressure constraint
-                    self.nodes[compressor.outlet_index].pressure = self.nodes[compressor.inlet_index].pressure * compressor.compression_ratio
+        """Refresh compressor node references and gas mixture state.
+
+        Flow rate Q_c and the P_outlet = r*P_inlet pressure constraint are
+        both handled inside the augmented Newton system in jacobian_matrix()
+        and the simulation() main loop. We deliberately do not overwrite
+        outlet pressure here — that post-step projection used to compound
+        across many compressors and break convergence.
+
+        Also keep mass_flow_rate in sync with the current Newton estimate
+        of Q_c so that power_consumption() reflects the latest state.
+        """
+        if self.compressors is None:
+            return
+        for compressor in self.compressors.values():
+            compressor.inlet = self.nodes[compressor.inlet_index]
+            compressor.outlet = self.nodes[compressor.outlet_index]
+            compressor.update_gas_mixture()
+            if compressor.flow_rate is not None:
+                std_density = (
+                    compressor.gas_mixture.standard_density
+                    if hasattr(compressor.gas_mixture, "standard_density")
+                    else 0.8
+                )
+                compressor.mass_flow_rate = compressor.flow_rate * std_density
 
     def update_connection_flow_rate(self):
         for connection in self.connections.values():
@@ -947,6 +1020,27 @@ class Network:
                 use_cuda=use_cuda,
             )
 
+            # Append the compressor constraint residuals so the augmented
+            # Newton system in jacobian_matrix() has a matching RHS.
+            # Constraint per compressor: F = P_outlet - r*P_inlet (= 0 at
+            # convergence). Convention J @ delta_x = -F, so we append
+            #   r*P_inlet - P_outlet.
+            if self.compressors is not None and len(self.compressors) > 0:
+                constraint_residuals = []
+                for compressor in self.compressors.values():
+                    p_in = self.nodes[compressor.inlet_index].pressure
+                    p_out = self.nodes[compressor.outlet_index].pressure
+                    r = compressor.compression_ratio
+                    constraint_residuals.append(r * p_in - p_out)
+                if use_cuda:
+                    delta_flow = cp.concatenate(
+                        (delta_flow, cp.array(constraint_residuals))
+                    )
+                else:
+                    delta_flow = np.concatenate(
+                        (delta_flow, np.array(constraint_residuals))
+                    )
+
             # Update volumetric flow rate target
             for n in self.nodes.values():
                 if n.flow_type == "volumetric":
@@ -970,13 +1064,30 @@ class Network:
             if use_cuda:
                 delta_p = cp.linalg.solve(j_mat, delta_flow)
             else:
-                delta_p = np.linalg.solve(
-                    j_mat, delta_flow
-                )  # np.linalg.solve() uses LU decomposition as default
+                # Fall back to least squares if the Newton Jacobian is
+                # singular. Hydrogen networks with long series-compressor
+                # chains routinely produce a near-singular Jacobian; lstsq
+                # returns the minimum-norm solution which is meaningful
+                # enough for the next Newton step.
+                try:
+                    delta_p = np.linalg.solve(
+                        j_mat, delta_flow
+                    )  # np.linalg.solve() uses LU decomposition as default
+                except np.linalg.LinAlgError:
+                    delta_p = np.linalg.lstsq(j_mat, delta_flow, rcond=None)[0]
             delta_p /= (
                 underrelaxation_factor  # divided by 2 to ensure better convergence
             )
             logging.debug(delta_p)
+
+            # Split off compressor-flow updates (last n_compressors entries
+            # of the augmented solve) before re-inserting reference nodes.
+            n_comp_aug = len(self.compressors) if self.compressors is not None else 0
+            if n_comp_aug > 0:
+                delta_qc = delta_p[-n_comp_aug:]
+                delta_p = delta_p[:-n_comp_aug]
+            else:
+                delta_qc = None
 
             # Add 0 to the delta_p vector for reference nodes
             for i in self.non_junction_nodes:
@@ -989,6 +1100,13 @@ class Network:
                     delta_p = np.insert(delta_p, sim_idx, 0)
 
             p += delta_p  # update nodal pressure list
+
+            # Apply compressor flow updates from the augmented Newton step.
+            if delta_qc is not None:
+                for k, compressor in enumerate(self.compressors.values()):
+                    if compressor.flow_rate is None:
+                        compressor.flow_rate = 0.0
+                    compressor.flow_rate = float(compressor.flow_rate) + float(delta_qc[k])
 
             for i in self.nodes.keys():
                 if i not in self.reference_nodes:
@@ -1013,7 +1131,23 @@ class Network:
             )
             err = max([abs(x) for x in delta_flow])
 
-            logging.debug(max([abs(x) for x in (delta_flow / target_flow)]))
+            # delta_flow is augmented with compressor-constraint residuals at
+            # the tail. Use only its junction-node portion for this
+            # debug-only relative-change calculation against target_flow.
+            n_junction_only = len(target_flow)
+            delta_flow_junction = delta_flow[:n_junction_only]
+            if use_cuda:
+                nonzero_target = cp.abs(target_flow) > 0
+                if cp.any(nonzero_target):
+                    logging.debug(
+                        cp.max(cp.abs(delta_flow_junction[nonzero_target] / target_flow[nonzero_target]))
+                    )
+            else:
+                nonzero_target = np.abs(target_flow) > 0
+                if np.any(nonzero_target):
+                    logging.debug(
+                        np.max(np.abs(delta_flow_junction[nonzero_target] / target_flow[nonzero_target]))
+                    )
             logging.debug(delta_p)
             self.update_connection_flow_rate()
 
